@@ -1,0 +1,39 @@
+{
+  "success": true,
+  "data": {
+    "note_id": "6ad1f8610000000018018eef",
+    "title": "肥肥猫～",
+    "type": "video",
+    "images": [],
+    "videos": [
+      {
+        "url": "https://media.example.com/cat.mp4",
+        "source_width": 720,
+        "source_height": 1280,
+        "url_expires_at": null,
+        "verification": "not_checked",
+        "format": "mp4",
+        "codec": "H264",
+        "quality": "HD",
+        "duration_seconds": 7.175,
+        "size_bytes": 2711080
+      }
+    ],
+    "cover": {
+      "url": "https://media.example.com/cat-cover.jpg",
+      "source_width": 1440,
+      "source_height": 1920,
+      "url_expires_at": null,
+      "verification": "not_checked"
+    }
+  },
+  "error": null,
+  "meta": {
+    "request_id": "da3059b7-b781-41f6-b3b1-5b44b9713724",
+    "parsed_at": "2026-10-17T08:00:00Z",
+    "cache": {
+      "hit": false,
+      "expires_at": "2026-10-17T08:02:00Z"
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "success": true,
+  "data": {
+    "note_id": "6ad2355f000000001a027848",
+    "title": "招商银行万事达境外支付失败",
+    "type": "image",
+    "images": [
+      {
+        "url": "https://media.example.com/image-1.jpg",
+        "source_width": 931,
+        "source_height": 880,
+        "url_expires_at": null,
+        "verification": "not_checked",
+        "index": 1
+      },
+      {
+        "url": "https://media.example.com/image-2.jpg",
+        "source_width": 1264,
+        "source_height": 1395,
+        "url_expires_at": null,
+        "verification": "not_checked",
+        "index": 2
+      },
+      {
+        "url": "https://media.example.com/image-3.jpg",
+        "source_width": 1264,
+        "source_height": 1349,
+        "url_expires_at": null,
+        "verification": "not_checked",
+        "index": 3
+      },
+      {
+        "url": "https://media.example.com/image-4.jpg",
+        "source_width": 4096,
+        "source_height": 5461,
+        "url_expires_at": null,
+        "verification": "not_checked",
+        "index": 4
+      }
+    ],
+    "videos": [],
+    "cover": null
+  },
+  "error": null,
+  "meta": {
+    "request_id": "bdf2bfb0-c44b-4d49-99dd-cdf1f439d69a",
+    "parsed_at": "2026-10-17T08:00:00Z",
+    "cache": {
+      "hit": false,
+      "expires_at": "2026-10-17T08:02:00Z"
+    }
+  }
+}

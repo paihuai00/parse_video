@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "The URL, parser, service, API, logging, and deployment contracts span multiple layers and must remain consistent."}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Shared limits, error codes, response fields, and configuration values must have one source of truth."}
+{"file": ".trellis/tasks/10-18-implement-xhs-media-parser-api/research/contract-baseline.md", "reason": "Condensed source map, confirmed direct-link outcome, feasibility findings, and delivery constraints."}

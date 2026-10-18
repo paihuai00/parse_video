@@ -1,0 +1,310 @@
+{
+  "notes": [
+    {
+      "note_id": "6ad304cd00000000140125ff",
+      "title": "希望马来西亚可以尽快逃离烟霾💨",
+      "type": "video",
+      "image_count": 1,
+      "video_formats": [
+        {
+          "width": 720,
+          "height": 1280,
+          "duration_seconds": 16.567,
+          "size_bytes": 4495295,
+          "format": "mp4"
+        }
+      ]
+    },
+    {
+      "note_id": "6ad2355f000000001a027848",
+      "title": "招商银行万事达境外支付失败",
+      "type": "normal",
+      "image_count": 4,
+      "video_formats": []
+    },
+    {
+      "note_id": "6ad1f8610000000018018eef",
+      "title": "肥肥猫～",
+      "type": "video",
+      "image_count": 1,
+      "video_formats": [
+        {
+          "width": 720,
+          "height": 1280,
+          "duration_seconds": 7.175,
+          "size_bytes": 2711080,
+          "format": "mp4"
+        }
+      ]
+    },
+    {
+      "note_id": "6ab3d9f0000000001800795a",
+      "title": "大马国庆5天4晚旅行攻略｜懒人版不赶路🇲🇾",
+      "type": "normal",
+      "image_count": 10,
+      "video_formats": []
+    },
+    {
+      "note_id": "6ad21996000000001b01d26b",
+      "title": "离岸信托个税谁来管？外籍个人分红还免不免？",
+      "type": "video",
+      "image_count": 1,
+      "video_formats": [
+        {
+          "width": 1280,
+          "height": 720,
+          "duration_seconds": 979.41,
+          "size_bytes": 168970581,
+          "format": "mp4"
+        }
+      ]
+    }
+  ],
+  "media_checks": [
+    {
+      "note_id": "6ad304cd00000000140125ff",
+      "kind": "cover",
+      "index": 1,
+      "status": 206,
+      "content_type": "image/webp",
+      "content_range": "bytes 0-4095/155180",
+      "sample_bytes": 835,
+      "magic_hex": "52494646245e02005745425056503858",
+      "host": "sns-webpic-qc.xhscdn.com"
+    },
+    {
+      "note_id": "6ad304cd00000000140125ff",
+      "kind": "video",
+      "index": 1,
+      "status": 206,
+      "content_type": "video/mp4",
+      "content_range": "bytes 0-4095/4495295",
+      "sample_bytes": 4096,
+      "magic_hex": "000000206674797069736f6d00000200",
+      "host": "sns-video-v6.xhscdn.com"
+    },
+    {
+      "note_id": "6ad2355f000000001a027848",
+      "kind": "image",
+      "index": 1,
+      "status": 206,
+      "content_type": "image/webp",
+      "content_range": "bytes 0-4095/42862",
+      "sample_bytes": 4096,
+      "magic_hex": "5249464666a700005745425056503820",
+      "host": "sns-webpic-qc.xhscdn.com"
+    },
+    {
+      "note_id": "6ad2355f000000001a027848",
+      "kind": "image",
+      "index": 2,
+      "status": 206,
+      "content_type": "image/webp",
+      "content_range": "bytes 0-4095/32408",
+      "sample_bytes": 3523,
+      "magic_hex": "52494646907e00005745425056503858",
+      "host": "sns-webpic-qc.xhscdn.com"
+    },
+    {
+      "note_id": "6ad2355f000000001a027848",
+      "kind": "image",
+      "index": 3,
+      "status": 206,
+      "content_type": "image/webp",
+      "content_range": "bytes 0-4095/45626",
+      "sample_bytes": 3511,
+      "magic_hex": "5249464632b200005745425056503858",
+      "host": "sns-webpic-qc.xhscdn.com"
+    },
+    {
+      "note_id": "6ad2355f000000001a027848",
+      "kind": "image",
+      "index": 4,
+      "status": 206,
+      "content_type": "image/webp",
+      "content_range": "bytes 0-4095/62584",
+      "sample_bytes": 4096,
+      "magic_hex": "5249464670f400005745425056503858",
+      "host": "sns-webpic-qc.xhscdn.com"
+    },
+    {
+      "note_id": "6ad1f8610000000018018eef",
+      "kind": "cover",
+      "index": 1,
+      "status": 206,
+      "content_type": "image/webp",
+      "content_range": "bytes 0-4095/177228",
+      "sample_bytes": 4096,
+      "magic_hex": "5249464644b402005745425056503858",
+      "host": "sns-webpic-qc.xhscdn.com"
+    },
+    {
+      "note_id": "6ad1f8610000000018018eef",
+      "kind": "video",
+      "index": 1,
+      "status": 206,
+      "content_type": "video/mp4",
+      "content_range": "bytes 0-4095/2711080",
+      "sample_bytes": 4096,
+      "magic_hex": "000000206674797069736f6d00000200",
+      "host": "sns-video-v6.xhscdn.com"
+    },
+    {
+      "note_id": "6ab3d9f0000000001800795a",
+      "kind": "image",
+      "index": 1,
+      "status": 206,
+      "content_type": "image/webp",
+      "content_range": "bytes 0-4095/552542",
+      "sample_bytes": 3510,
+      "magic_hex": "52494646566e08005745425056503858",
+      "host": "sns-webpic-qc.xhscdn.com"
+    },
+    {
+      "note_id": "6ab3d9f0000000001800795a",
+      "kind": "image",
+      "index": 2,
+      "status": 206,
+      "content_type": "image/webp",
+      "content_range": "bytes 0-4095/615942",
+      "sample_bytes": 4096,
+      "magic_hex": "52494646fe6509005745425056503858",
+      "host": "sns-webpic-qc.xhscdn.com"
+    },
+    {
+      "note_id": "6ab3d9f0000000001800795a",
+      "kind": "image",
+      "index": 3,
+      "status": 206,
+      "content_type": "image/webp",
+      "content_range": "bytes 0-4095/442266",
+      "sample_bytes": 4096,
+      "magic_hex": "5249464692bf06005745425056503858",
+      "host": "sns-webpic-qc.xhscdn.com"
+    },
+    {
+      "note_id": "6ab3d9f0000000001800795a",
+      "kind": "image",
+      "index": 4,
+      "status": 206,
+      "content_type": "image/webp",
+      "content_range": "bytes 0-4095/400748",
+      "sample_bytes": 4096,
+      "magic_hex": "52494646641d06005745425056503858",
+      "host": "sns-webpic-qc.xhscdn.com"
+    },
+    {
+      "note_id": "6ab3d9f0000000001800795a",
+      "kind": "image",
+      "index": 5,
+      "status": 206,
+      "content_type": "image/webp",
+      "content_range": "bytes 0-4095/403392",
+      "sample_bytes": 3510,
+      "magic_hex": "52494646b82706005745425056503858",
+      "host": "sns-webpic-qc.xhscdn.com"
+    },
+    {
+      "note_id": "6ab3d9f0000000001800795a",
+      "kind": "image",
+      "index": 6,
+      "status": 206,
+      "content_type": "image/webp",
+      "content_range": "bytes 0-4095/505584",
+      "sample_bytes": 3511,
+      "magic_hex": "52494646e8b607005745425056503858",
+      "host": "sns-webpic-qc.xhscdn.com"
+    },
+    {
+      "note_id": "6ab3d9f0000000001800795a",
+      "kind": "image",
+      "index": 7,
+      "status": 206,
+      "content_type": "image/webp",
+      "content_range": "bytes 0-4095/326558",
+      "sample_bytes": 3514,
+      "magic_hex": "5249464696fb04005745425056503858",
+      "host": "sns-webpic-qc.xhscdn.com"
+    },
+    {
+      "note_id": "6ab3d9f0000000001800795a",
+      "kind": "image",
+      "index": 8,
+      "status": 206,
+      "content_type": "image/webp",
+      "content_range": "bytes 0-4095/526970",
+      "sample_bytes": 3511,
+      "magic_hex": "52494646720a08005745425056503858",
+      "host": "sns-webpic-qc.xhscdn.com"
+    },
+    {
+      "note_id": "6ab3d9f0000000001800795a",
+      "kind": "image",
+      "index": 9,
+      "status": 206,
+      "content_type": "image/webp",
+      "content_range": "bytes 0-4095/403888",
+      "sample_bytes": 3511,
+      "magic_hex": "52494646a82906005745425056503858",
+      "host": "sns-webpic-qc.xhscdn.com"
+    },
+    {
+      "note_id": "6ab3d9f0000000001800795a",
+      "kind": "image",
+      "index": 10,
+      "status": 206,
+      "content_type": "image/webp",
+      "content_range": "bytes 0-4095/309994",
+      "sample_bytes": 4096,
+      "magic_hex": "52494646e2ba04005745425056503858",
+      "host": "sns-webpic-qc.xhscdn.com"
+    },
+    {
+      "note_id": "6ad21996000000001b01d26b",
+      "kind": "cover",
+      "index": 1,
+      "status": 206,
+      "content_type": "image/webp",
+      "content_range": "bytes 0-4095/83022",
+      "sample_bytes": 4096,
+      "magic_hex": "52494646464401005745425056503858",
+      "host": "sns-webpic-qc.xhscdn.com"
+    },
+    {
+      "note_id": "6ad21996000000001b01d26b",
+      "kind": "video",
+      "index": 1,
+      "status": 206,
+      "content_type": "video/mp4",
+      "content_range": "bytes 0-4095/168970581",
+      "sample_bytes": 4096,
+      "magic_hex": "000000206674797069736f6d00000200",
+      "host": "sns-video-v6.xhscdn.com"
+    }
+  ],
+  "verification": "Each media URL was requested anonymously over HTTPS with Range bytes=0-4095; full-file integrity was not checked.",
+  "recorded_on": "2026-10-17",
+  "timezone": "Asia/Shanghai",
+  "scope": "Local feasibility probe, not production API or VPS acceptance.",
+  "environment": {
+    "os": "Darwin",
+    "python": "3.9.6",
+    "curl_cffi": "0.13.0",
+    "impersonate": "chrome136",
+    "account_login_used": false,
+    "browser_cookies_imported": false,
+    "anonymous_session_per_note": true,
+    "tls_verification": true
+  },
+  "request_headers": {
+    "Referer": "https://www.xiaohongshu.com/",
+    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"
+  },
+  "limitations": [
+    "No full-file integrity or playback validation.",
+    "Dimensions and duration are from page metadata.",
+    "VPS and caller-network accessibility have not been tested.",
+    "Share tokens and signed media URLs are intentionally omitted.",
+    "Range was requested, but reading stopped after the first available chunk; sample_bytes records actual bytes observed."
+  ]
+}

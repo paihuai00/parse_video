@@ -1,0 +1,1106 @@
+{
+  "openapi": "3.1.0",
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "info": {
+    "title": "小红书媒体解析 API",
+    "version": "0.1.0",
+    "description": "面向小流量单机 VPS：调用方提供单个小红书链接，服务匿名获取页面并返回图片或主视频 MP4 直链，不使用小红书账号登录。X-API-Key 是本站调用密钥，与小红书账号、密码及 Cookie 无关。仅缓存成功结果，默认 TTL 120 秒。v1 不代理下载、不上传媒体、不验证媒体文件内容；媒体源尺寸等字段来自网页元数据。所有示例 media.example.com URL 都是占位地址。框架与反向代理可控制的错误响应均应为 application/json；网络断连等无 HTTP 响应的情形不在 JSON 保证范围。"
+  },
+  "security": [
+    {
+      "ApiKeyAuth": []
+    }
+  ],
+  "paths": {
+    "/api/v1/xiaohongshu/parse": {
+      "post": {
+        "operationId": "parseXiaohongshuNote",
+        "summary": "解析单个小红书笔记的图片或 MP4 直链",
+        "description": "接受完整长链接或 xhslink.com 短链，保留分享参数。短链解析后仍需校验目标域名、路径和笔记 ID。整段分享文案、批量链接、登录受限内容和不受支持的媒体类型不在 v1 成功范围内。请求必须携带本站 X-API-Key。",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功提取受支持的正文媒体。示例媒体 URL 仅为占位，不是真实下载地址。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParseSuccess"
+                },
+                "examples": {
+                  "image": {
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "note_id": "6ad2355f000000001a027848",
+                        "title": "招商银行万事达境外支付失败",
+                        "type": "image",
+                        "images": [
+                          {
+                            "url": "https://media.example.com/image-1.jpg",
+                            "source_width": 931,
+                            "source_height": 880,
+                            "url_expires_at": null,
+                            "verification": "not_checked",
+                            "index": 1
+                          },
+                          {
+                            "url": "https://media.example.com/image-2.jpg",
+                            "source_width": 1264,
+                            "source_height": 1395,
+                            "url_expires_at": null,
+                            "verification": "not_checked",
+                            "index": 2
+                          },
+                          {
+                            "url": "https://media.example.com/image-3.jpg",
+                            "source_width": 1264,
+                            "source_height": 1349,
+                            "url_expires_at": null,
+                            "verification": "not_checked",
+                            "index": 3
+                          },
+                          {
+                            "url": "https://media.example.com/image-4.jpg",
+                            "source_width": 4096,
+                            "source_height": 5461,
+                            "url_expires_at": null,
+                            "verification": "not_checked",
+                            "index": 4
+                          }
+                        ],
+                        "videos": [],
+                        "cover": null
+                      },
+                      "error": null,
+                      "meta": {
+                        "request_id": "bdf2bfb0-c44b-4d49-99dd-cdf1f439d69a",
+                        "parsed_at": "2026-10-17T08:00:00Z",
+                        "cache": {
+                          "hit": false,
+                          "expires_at": "2026-10-17T08:02:00Z"
+                        }
+                      }
+                    }
+                  },
+                  "video": {
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "note_id": "6ad1f8610000000018018eef",
+                        "title": "肥肥猫～",
+                        "type": "video",
+                        "images": [],
+                        "videos": [
+                          {
+                            "url": "https://media.example.com/cat.mp4",
+                            "source_width": 720,
+                            "source_height": 1280,
+                            "url_expires_at": null,
+                            "verification": "not_checked",
+                            "format": "mp4",
+                            "codec": "H264",
+                            "quality": "HD",
+                            "duration_seconds": 7.175,
+                            "size_bytes": 2711080
+                          }
+                        ],
+                        "cover": {
+                          "url": "https://media.example.com/cat-cover.jpg",
+                          "source_width": 1440,
+                          "source_height": 1920,
+                          "url_expires_at": null,
+                          "verification": "not_checked"
+                        }
+                      },
+                      "error": null,
+                      "meta": {
+                        "request_id": "da3059b7-b781-41f6-b3b1-5b44b9713724",
+                        "parsed_at": "2026-10-17T08:00:00Z",
+                        "cache": {
+                          "hit": false,
+                          "expires_at": "2026-10-17T08:02:00Z"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Error405"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          }
+        }
+      }
+    },
+    "/healthz": {
+      "get": {
+        "operationId": "getHealth",
+        "summary": "检查本地服务进程是否能响应",
+        "description": "无需 API Key；仅检查本地进程健康，不访问小红书，不验证匿名解析能力、缓存或媒体地址。",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "本地进程可响应。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                },
+                "example": {
+                  "status": "ok"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "本站 API 调用密钥。不是小红书登录凭据；调用方不得提交小红书 Cookie、账号或密码。"
+      }
+    },
+    "schemas": {
+      "ParseRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https?://",
+            "maxLength": 4096,
+            "description": "单个完整 HTTP(S) 小红书笔记链接。计划支持 www.xiaohongshu.com/discovery/item/{note_id}、www.xiaohongshu.com/explore/{note_id} 和 xhslink.com 短链。保留 xsec_token 等分享参数。不接受整段分享文案、链接数组或任意站点 URL。",
+            "examples": [
+              "https://www.xiaohongshu.com/explore/6ad1f8610000000018018eef?xsec_token=EXAMPLE_TOKEN&xsec_source=pc_share"
+            ]
+          },
+          "refresh": {
+            "type": "boolean",
+            "default": false,
+            "description": "跳过本服务解析缓存重新获取页面；仍受密钥、限流和并发约束，不表示刷新小红书内容或延长媒体直链寿命。"
+          }
+        }
+      },
+      "ImageMedia": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "url",
+          "source_width",
+          "source_height",
+          "url_expires_at",
+          "verification",
+          "index"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https?://",
+            "description": "页面提取的媒体直链；不保证永久有效，也不保证所有调用环境都可直接访问。示例 media.example.com 仅为占位，不是真实媒体地址。"
+          },
+          "source_width": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "description": "网页提供的宽度元数据；未下载文件核验，未知为 null。"
+          },
+          "source_height": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "description": "网页提供的高度元数据；未下载文件核验，未知为 null。"
+          },
+          "url_expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "上游明确提供的媒体地址失效时间；未知为 null，不使用本服务缓存到期时间代替。"
+          },
+          "verification": {
+            "type": "string",
+            "const": "not_checked",
+            "description": "v1 仅提取链接，不请求媒体文件；未检查响应文件头、部分内容、完整下载或播放。"
+          },
+          "index": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "正文图片在笔记中的顺序，从 1 开始，连续递增。"
+          }
+        }
+      },
+      "CoverMedia": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "url",
+          "source_width",
+          "source_height",
+          "url_expires_at",
+          "verification"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https?://",
+            "description": "页面提取的媒体直链；不保证永久有效，也不保证所有调用环境都可直接访问。示例 media.example.com 仅为占位，不是真实媒体地址。"
+          },
+          "source_width": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "description": "网页提供的宽度元数据；未下载文件核验，未知为 null。"
+          },
+          "source_height": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "description": "网页提供的高度元数据；未下载文件核验，未知为 null。"
+          },
+          "url_expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "上游明确提供的媒体地址失效时间；未知为 null，不使用本服务缓存到期时间代替。"
+          },
+          "verification": {
+            "type": "string",
+            "const": "not_checked",
+            "description": "v1 仅提取链接，不请求媒体文件；未检查响应文件头、部分内容、完整下载或播放。"
+          }
+        },
+        "description": "视频封面，不计入正文图片或主视频数量。"
+      },
+      "VideoMedia": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "url",
+          "source_width",
+          "source_height",
+          "url_expires_at",
+          "verification",
+          "format",
+          "codec",
+          "quality",
+          "duration_seconds",
+          "size_bytes"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https?://",
+            "description": "页面提取的媒体直链；不保证永久有效，也不保证所有调用环境都可直接访问。示例 media.example.com 仅为占位，不是真实媒体地址。"
+          },
+          "source_width": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "description": "网页提供的宽度元数据；未下载文件核验，未知为 null。"
+          },
+          "source_height": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "description": "网页提供的高度元数据；未下载文件核验，未知为 null。"
+          },
+          "url_expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "上游明确提供的媒体地址失效时间；未知为 null，不使用本服务缓存到期时间代替。"
+          },
+          "verification": {
+            "type": "string",
+            "const": "not_checked",
+            "description": "v1 仅提取链接，不请求媒体文件；未检查响应文件头、部分内容、完整下载或播放。"
+          },
+          "format": {
+            "type": "string",
+            "const": "mp4",
+            "description": "依据上游媒体数据选择 MP4；不表示已下载校验文件容器。"
+          },
+          "codec": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "上游提供的编码信息，未知为 null。"
+          },
+          "quality": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "上游提供的质量标签，未知为 null；不保证原始视频质量。"
+          },
+          "duration_seconds": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "网页提供的时长，单位秒；未知为 null。"
+          },
+          "size_bytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "网页提供的文件大小，单位字节；未知为 null，未下载核验。"
+          }
+        }
+      },
+      "ImageNote": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "note_id",
+          "title",
+          "type",
+          "images",
+          "videos",
+          "cover"
+        ],
+        "properties": {
+          "note_id": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{24}$"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "笔记标题，无法取得时为 null。"
+          },
+          "type": {
+            "type": "string",
+            "const": "image"
+          },
+          "images": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/ImageMedia"
+            },
+            "description": "全部受支持的正文静态图片，按原笔记顺序排列。实况图不得静态降级为成功。"
+          },
+          "videos": {
+            "type": "array",
+            "maxItems": 0,
+            "items": {
+              "$ref": "#/components/schemas/VideoMedia"
+            }
+          },
+          "cover": {
+            "type": "null"
+          }
+        },
+        "description": "普通静态图文；images 至少有一项，videos 为空，cover 为 null。"
+      },
+      "VideoNote": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "note_id",
+          "title",
+          "type",
+          "images",
+          "videos",
+          "cover"
+        ],
+        "properties": {
+          "note_id": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{24}$"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "笔记标题，无法取得时为 null。"
+          },
+          "type": {
+            "type": "string",
+            "const": "video"
+          },
+          "images": {
+            "type": "array",
+            "maxItems": 0,
+            "items": {
+              "$ref": "#/components/schemas/ImageMedia"
+            }
+          },
+          "videos": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/VideoMedia"
+            },
+            "description": "v1 恰好返回一个选中的主视频 MP4，不包含音轨、HLS 或重复清晰度。"
+          },
+          "cover": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CoverMedia"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "description": "视频笔记必须取得主视频 MP4；只有封面不构成成功。"
+      },
+      "ParsedNote": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ImageNote"
+          },
+          {
+            "$ref": "#/components/schemas/VideoNote"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "image": "#/components/schemas/ImageNote",
+            "video": "#/components/schemas/VideoNote"
+          }
+        },
+        "description": "v1 仅支持普通静态图文和单主视频。实况图、无法完整处理的混合媒体返回 UNSUPPORTED_CONTENT。"
+      },
+      "CacheMetadata": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "hit",
+          "expires_at"
+        ],
+        "properties": {
+          "hit": {
+            "type": "boolean"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "本服务解析结果缓存到期时间。默认成功结果缓存 120 秒；不代表媒体直链的有效期。"
+          }
+        }
+      },
+      "ResponseMeta": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "request_id",
+          "parsed_at",
+          "cache"
+        ],
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "parsed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "成功提取笔记数据的 UTC 时间；缓存命中时保留原提取时间，失败为 null。"
+          },
+          "cache": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CacheMetadata"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "成功结果的缓存信息；失败为 null，仅缓存成功结果。"
+          }
+        }
+      },
+      "ErrorDetails": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message",
+          "retryable"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "INVALID_REQUEST",
+              "INVALID_URL",
+              "UNAUTHORIZED",
+              "NOTE_NOT_FOUND",
+              "ROUTE_NOT_FOUND",
+              "METHOD_NOT_ALLOWED",
+              "INPUT_TOO_LARGE",
+              "UNSUPPORTED_CONTENT",
+              "RATE_LIMITED",
+              "INTERNAL_ERROR",
+              "UPSTREAM_BAD_RESPONSE",
+              "PARSE_FAILED",
+              "MEDIA_NOT_FOUND",
+              "BUSY",
+              "UPSTREAM_LOGIN_REQUIRED",
+              "UPSTREAM_ACCESS_RESTRICTED",
+              "UPSTREAM_RATE_LIMITED",
+              "UPSTREAM_TIMEOUT"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "description": "可供人阅读的错误说明；调用方应依据 code 处理，不依赖具体文案。"
+          },
+          "retryable": {
+            "type": "boolean",
+            "description": "同一输入在稍后重试是否有合理成功可能；不是立即重试指令。登录要求默认 false，本站繁忙及限流通常为 true。"
+          }
+        }
+      },
+      "ParseSuccess": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "data",
+          "error",
+          "meta"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/ParsedNote"
+          },
+          "error": {
+            "type": "null"
+          },
+          "meta": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ResponseMeta"
+              },
+              {
+                "properties": {
+                  "parsed_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "cache": {
+                    "$ref": "#/components/schemas/CacheMetadata"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "ParseError": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "data",
+          "error",
+          "meta"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": false
+          },
+          "data": {
+            "type": "null"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorDetails"
+          },
+          "meta": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ResponseMeta"
+              },
+              {
+                "properties": {
+                  "parsed_at": {
+                    "type": "null"
+                  },
+                  "cache": {
+                    "type": "null"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok"
+          }
+        }
+      }
+    },
+    "responses": {
+      "Error400": {
+        "description": "请求 JSON、参数或链接不合法。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ParseError"
+                },
+                {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "INVALID_REQUEST",
+                            "INVALID_URL"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "Error401": {
+        "description": "缺少本站 API Key 或密钥错误；与小红书登录无关。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ParseError"
+                },
+                {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "UNAUTHORIZED"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "Error404": {
+        "description": "上游明确确认笔记不存在或已删除，或访问了不存在的本站路由。不能把登录页误判为笔记不存在。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ParseError"
+                },
+                {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOTE_NOT_FOUND",
+                            "ROUTE_NOT_FOUND"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "Error405": {
+        "description": "本站路由不支持该 HTTP 方法。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ParseError"
+                },
+                {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "METHOD_NOT_ALLOWED"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "headers": {
+          "Allow": {
+            "description": "该路由允许的方法。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "Error413": {
+        "description": "请求体超过服务允许的大小。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ParseError"
+                },
+                {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "INPUT_TOO_LARGE"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "Error422": {
+        "description": "实况图或当前无法完整处理的其他媒体类型；不返回残缺成功结果。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ParseError"
+                },
+                {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "UNSUPPORTED_CONTENT"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "Error429": {
+        "description": "本站调用频率超过限制，使用 Retry-After 指示建议等待秒数。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ParseError"
+                },
+                {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "RATE_LIMITED"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "headers": {
+          "Retry-After": {
+            "description": "建议等待的秒数；429 返回，本服务 BUSY 时可返回。不是立即重试指令。",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      },
+      "Error500": {
+        "description": "未预期的内部异常；不返回内部堆栈、Cookie、签名参数或上游 HTML。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ParseError"
+                },
+                {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "INTERNAL_ERROR"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "Error502": {
+        "description": "上游响应异常、页面结构无法解析，或缺少应有的正文媒体。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ParseError"
+                },
+                {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "UPSTREAM_BAD_RESPONSE",
+                            "PARSE_FAILED",
+                            "MEDIA_NOT_FOUND"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "Error503": {
+        "description": "本站并发容量已满，或上游要求登录、限制访问、限制请求频率。BUSY 可使用 Retry-After。UPSTREAM_LOGIN_REQUIRED 的 retryable 默认为 false。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ParseError"
+                },
+                {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "BUSY",
+                            "UPSTREAM_LOGIN_REQUIRED",
+                            "UPSTREAM_ACCESS_RESTRICTED",
+                            "UPSTREAM_RATE_LIMITED"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            "examples": {
+              "loginRequired": {
+                "value": {
+                  "success": false,
+                  "data": null,
+                  "error": {
+                    "code": "UPSTREAM_LOGIN_REQUIRED",
+                    "message": "小红书当前要求登录，无法匿名获取该笔记。",
+                    "retryable": false
+                  },
+                  "meta": {
+                    "request_id": "b21b72f1-cc97-4fea-b851-3d76ea60b75a",
+                    "parsed_at": null,
+                    "cache": null
+                  }
+                }
+              }
+            }
+          }
+        },
+        "headers": {
+          "Retry-After": {
+            "description": "建议等待的秒数；429 返回，本服务 BUSY 时可返回。不是立即重试指令。",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      },
+      "Error504": {
+        "description": "上游获取或整个解析流程超过超时上限。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ParseError"
+                },
+                {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "UPSTREAM_TIMEOUT"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

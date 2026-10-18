@@ -1,0 +1,14 @@
+{
+  "success": false,
+  "data": null,
+  "error": {
+    "code": "UPSTREAM_LOGIN_REQUIRED",
+    "message": "小红书当前要求登录，无法匿名获取该笔记。",
+    "retryable": false
+  },
+  "meta": {
+    "request_id": "b21b72f1-cc97-4fea-b851-3d76ea60b75a",
+    "parsed_at": null,
+    "cache": null
+  }
+}
