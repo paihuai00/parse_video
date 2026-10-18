@@ -21,6 +21,7 @@ class FakeSession:
         self.kwargs = kwargs
         self.calls = []
         self.curl_options = {}
+        self.resolve_history = []
         self.__class__.instances.append(self)
 
     async def __aenter__(self):
@@ -31,6 +32,7 @@ class FakeSession:
 
     async def get(self, url, **kwargs):
         self.calls.append((url, kwargs))
+        self.resolve_history.append(self.curl_options.get(CurlOpt.RESOLVE))
         result = kwargs["content_callback"](b"<html>window.__INITIAL_STATE__={}</html>")
         if result == CURL_WRITEFUNC_ERROR:
             raise CurlError("callback aborted")
@@ -44,6 +46,7 @@ class RedirectSession(FakeSession):
 
     async def get(self, url, **kwargs):
         self.calls.append((url, kwargs))
+        self.resolve_history.append(self.curl_options.get(CurlOpt.RESOLVE))
         status, headers, body = self.__class__.responses.pop(0)
         result = kwargs["content_callback"](body)
         if result == CURL_WRITEFUNC_ERROR:
@@ -101,18 +104,58 @@ async def test_unsafe_redirect_is_validated_before_the_next_connection(monkeypat
         calls.append(url)
         if "evil.example" in url:
             raise AppError("INVALID_URL", 400, detail="unsupported host")
-        return ResolvedHop(url, "xhslink.com", 443, None, ("8.8.8.8",))
+        return ResolvedHop(url, "xhslink.cn", 443, None, ("8.8.8.8",))
 
-    RedirectSession.responses = [(302, {"location": "https://evil.example/private"}, b"")]
+    RedirectSession.responses = [
+        (302, {"location": "https://xhslink.cn.evil.example/private"}, b"")
+    ]
     monkeypatch.setattr("app.parser.client.AsyncSession", RedirectSession)
     monkeypatch.setattr("app.parser.client.resolve_url", fake_resolve)
     client = XiaohongshuClient(Settings(api_key="x", environment="test"))
 
     with pytest.raises(AppError) as caught:
-        await client.fetch("https://xhslink.com/a", Deadline(1))
+        await client.fetch("https://xhslink.cn/o/example-token", Deadline(1))
     assert caught.value.code == "INVALID_URL"
-    assert calls == ["https://xhslink.com/a", "https://evil.example/private"]
+    assert calls == [
+        "https://xhslink.cn/o/example-token",
+        "https://xhslink.cn.evil.example/private",
+    ]
     assert len(RedirectSession.instances[-1].calls) == 1
+
+
+async def test_mobile_short_link_redirects_to_a_checked_detail_hop(monkeypatch) -> None:
+    note_id = "6ad1f8610000000018018eef"
+    detail_url = f"https://www.xiaohongshu.com/discovery/item/{note_id}?xsec_token=secret"
+    resolved = []
+
+    async def fake_resolve(url):
+        resolved.append(url)
+        if url.startswith("https://xhslink.cn/o/"):
+            return ResolvedHop(url, "xhslink.cn", 443, None, ("8.8.8.8",))
+        return ResolvedHop(url, "www.xiaohongshu.com", 443, note_id, ("1.1.1.1",))
+
+    RedirectSession.responses = [
+        (302, {"location": detail_url}, b""),
+        (200, {"content-type": "text/html; charset=utf-8"}, b"<html></html>"),
+    ]
+    monkeypatch.setattr("app.parser.client.AsyncSession", RedirectSession)
+    monkeypatch.setattr("app.parser.client.resolve_url", fake_resolve)
+    client = XiaohongshuClient(Settings(api_key="x", environment="test"))
+
+    result = await client.fetch("https://xhslink.cn/o/example-token", Deadline(1))
+
+    assert result.note_id == note_id
+    assert result.final_url == detail_url
+    assert resolved == ["https://xhslink.cn/o/example-token", detail_url]
+    session = RedirectSession.instances[-1]
+    assert len(session.calls) == 2
+    assert session.calls[0][1]["allow_redirects"] is False
+    assert session.calls[1][1]["allow_redirects"] is False
+    assert session.resolve_history == [
+        ["xhslink.cn:443:8.8.8.8"],
+        ["www.xiaohongshu.com:443:1.1.1.1"],
+    ]
+    assert session.curl_options == {CurlOpt.RESOLVE: ["www.xiaohongshu.com:443:1.1.1.1"]}
 
 
 async def test_redirect_limit_stops_before_connecting_to_the_fourth_target(monkeypatch) -> None:

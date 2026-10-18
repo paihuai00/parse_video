@@ -1,0 +1,26 @@
+{
+  "date": "2026-10-18",
+  "mode": "authorized_opt_in_file_header_probe",
+  "success": true,
+  "note_type": "image",
+  "image_count": 18,
+  "live_photo_count": 2,
+  "top_level_video_count": 0,
+  "has_cover": false,
+  "representative_media_checks": [
+    {
+      "kind": "image",
+      "status": 206,
+      "content_type": "image/jpeg",
+      "bytes_read": 1024
+    },
+    {
+      "kind": "live_video",
+      "status": 206,
+      "content_type": "video/mp4",
+      "bytes_read": 1024
+    }
+  ],
+  "full_download_or_playback_checked": false,
+  "secrets_or_media_urls_persisted": false
+}

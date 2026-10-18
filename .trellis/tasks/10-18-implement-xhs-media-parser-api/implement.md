@@ -2,7 +2,7 @@
 
 ## Gate 0: Repository and contract baseline
 
-- [ ] Confirm or initialize the intended Git repository before the final commit stage.
+- [x] Confirm the workspace is the intended Git repository before the final commit stage.
 - [x] Create Python 3.12 project metadata, application/test packages, formatting/lint/type-check configuration, and an exact dependency lock.
 - [x] Add contract-validation utilities that load `docs/openapi.json` and all checked-in examples.
 - [x] Convert applicable architecture rules into backend Trellis specs; mark frontend specs not applicable rather than inventing frontend conventions.
@@ -18,12 +18,17 @@ python3 -m compileall app tests scripts
 
 - [x] Implement configuration, domain errors, internal models, and public Pydantic models.
 - [x] Implement strict URL/path parsing, normalization, cache identity, public-address classification, asynchronous DNS resolution, and per-hop `ResolvedHop` plans.
+- [x] Add the user-observed mobile-copy entry point as exact `xhslink.cn/o/<URL-safe-token>` without suffix matching or broader `.cn` paths; cover cache identity, lookalikes, unsafe redirects, and the unchanged redirect budget.
 - [x] Implement the `curl_cffi==0.13.0` transport with manual redirects, `CurlOpt.RESOLVE`, TLS verification, cookie continuity, cancellation, one total deadline, limited retry, and bounded callback collection.
 - [x] Implement login/challenge/rate-limit/not-found classification.
 - [x] Implement bounded initial-state extraction and token-safe `undefined` conversion.
 - [x] Implement note lookup and image/video/cover normalization.
 - [x] Build sanitized synthetic fixtures for documented successful and failure structures.
 - [x] Add the opt-in probe without embedding live links or secrets.
+- [x] Extend immutable/internal image models with an optional paired Live Photo video while keeping ordinary image and normal-video semantics unchanged.
+- [x] Refactor stream candidate selection for reuse by normal main videos and per-image Live Photo streams; preserve main/backup fallback, URL allowlisting, MP4 evidence, and deterministic ranking.
+- [x] Normalize each declared Live Photo as its still image plus exactly one nested MP4. Do not copy still-image metadata onto the motion clip, and fail without partial success when no supported MP4 exists.
+- [x] Add sanitized ordinary-image, multiple-Live-Photo, empty-stream, missing-MP4, unsupported-live-broadcast, and unknown-mixed fixtures/tests without persisting the real share token or media URLs.
 
 Validation:
 
@@ -39,6 +44,7 @@ Rollback point: parser and transport remain independently testable and are not y
 - [x] Implement startup configuration validation and constant-time API-key comparison.
 - [x] Add request-body/field constraints, request IDs, unified exception handlers, and secret-safe structured logging.
 - [x] Verify runtime response models and checked-in OpenAPI/examples remain aligned.
+- [x] Add optional omitted-when-absent `ImageMedia.live_video`, keep image-note `videos=[]`, and update runtime/checked-in contract validation plus a sanitized Live Photo response example.
 
 Validation:
 
@@ -67,8 +73,8 @@ Rollback point: service controls are composed around the API/parser and can be r
 ## Gate 4: Container and documentation delivery
 
 - [x] Add `Dockerfile`, `compose.yaml`, `.dockerignore`, `.env.example`, production entrypoint, and Nginx example.
-- [ ] Verify single-worker/non-root runtime, missing-key startup failure, loopback binding, health check, resource limits, and log rotation configuration.
-- [x] Update README, technical design, implementation checklist, deployment guide, OpenAPI, and examples to match delivered behavior.
+- [x] Verify single-worker/non-root runtime, missing-key startup failure, loopback binding, health check, resource limits, and log rotation configuration.
+- [x] Update README, technical design, implementation checklist, deployment guide, OpenAPI, and examples to match delivered Live Photo behavior.
 - [x] Keep VPS/P5 checkboxes open and state exactly which real-network checks were not run.
 
 Validation when Docker is available:
@@ -86,11 +92,13 @@ Rollback point: preserve the previous tagged image/config pair; stop the candida
 ## Gate 5: Full quality review
 
 - [x] Run formatting, lint, type checking, full offline tests, contract checks, and Compose static checks.
-- [ ] Build and start the image, verify non-root runtime, and run the container health check when a Docker daemon is available.
+- [x] Build and start the image, verify non-root runtime, and run the container health check when a Docker daemon is available.
 - [x] Review cross-layer propagation from URL input through internal models to response serialization and logging.
 - [x] Verify no secrets, live tokens, signed media URLs, or raw HTML were added to tracked files or test output.
-- [ ] Run the opt-in real probe only if the user supplies an authorized link/environment; record a redacted result and do not convert a missing external test into an implementation failure.
-- [x] Update Trellis backend specs with the implemented cross-layer contract and discovered gotchas.
+- [x] Re-run full lint, type checking, tests, contract validation, and the local Docker build/health check after the Live Photo change.
+- [x] Run the opt-in real probe against the user-supplied authorized Live Photo link while it remains usable; record only counts/status in a redacted result and do not persist the input or returned URLs.
+- [x] Run one redacted redirect/parse probe for the authorized mobile-copy short link; retain only exact hosts, generalized paths, query key names, redirect count, and success status—never its token, query values, note ID, request ID, media URLs, or HTML.
+- [x] Update Trellis backend specs with the implemented Live Photo cross-layer contract and discovered gotchas.
 - [ ] Resolve the Git repository requirement, commit the reviewed result, and complete the finish workflow.
 
 Expected final commands (exact tool configuration may be refined in Gate 0):

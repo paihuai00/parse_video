@@ -1,12 +1,12 @@
 # 技术方案与已验证细节
 
-日期：2026-10-18（Asia/Shanghai）。状态：P1–P4 已实现并通过离线测试；真实网络和 VPS 验收待执行。
+日期：2026-10-18（Asia/Shanghai）。状态：P1–P4 已实现并通过离线测试；授权 Live Photo 与手机短链样本已完成本地真实网络脱敏探测，VPS 验收待执行。
 
 ## 1. 范围与当前事实
 
-第一版是单台 VPS 上的同步 HTTP JSON API。调用者提交一条小红书链接，服务返回图片或 MP4 地址。用户已经安装 Docker，将自行部署。
+第一版是单台 VPS 上的同步 HTTP JSON API。调用者提交一条小红书链接，服务返回有序图片、与图片一一关联的 Live Photo 动态 MP4，或普通视频笔记的主 MP4 地址。用户已经安装 Docker，将自行部署。
 
-仓库已交付 FastAPI 应用、解析核心、单进程资源控制、离线测试、探测脚本和 Docker/Compose/Nginx 文件。当前未连接 VPS，也未使用新的真实分享链接执行探测。部署相关参数是可调整的初始值，不是平台公布的限额或性能承诺。
+仓库已交付 FastAPI 应用、解析核心、单进程资源控制、离线测试、探测脚本和 Docker/Compose/Nginx 文件。当前未连接 VPS；一篇用户授权的 Live Photo 分享链接已在本地完成脱敏解析及有界文件头检查，一个授权 `xhslink.cn/o/<token>` 样本已确认一次受控跳转可到达标准详情页。部署相关参数是可调整的初始值，不是平台公布的限额或性能承诺。
 
 ### 已验证的匿名访问组合
 
@@ -29,13 +29,13 @@
 
 ## 2. 第一版功能
 
-- 一次接收一个完整 URL；支持 `/discovery/item/{id}`、`/explore/{id}`，以及经逐跳检查的小红书短链。短链流程仍须实现和验收，当前真实样本均为长链接。
-- 图文返回全部正文图片，保持原顺序。
+- 一次接收一个完整 URL；支持 `/discovery/item/{id}`、`/explore/{id}`，以及经逐跳检查的 `xhslink.com` 短链和手机复制的 `xhslink.cn/o/<token>`。后者已用授权样本验证一次跳转到标准详情页。
+- 图文返回全部正文图片，保持原顺序；Live Photo 在对应图片的 `live_video` 中返回一个选中的动态 MP4。
 - 视频返回一个选中的 MP4 和独立封面。
 - 返回结构化 JSON 错误，区分本站密钥问题、输入错误、上游登录限制、超时和解析结构变化。
 - 提供 `refresh` 跳过本服务缓存；提供 `/healthz` 本机进程健康检查。
 
-第一版的范围不包含分享文案提取、批量解析、作者主页采集、评论采集、实况图、转码、下载代理、永久文件存储或无水印处理。明确检测到尚不能完整支持的实况图或混合媒体时，返回 `UNSUPPORTED_CONTENT`。
+第一版的范围不包含分享文案提取、批量解析、作者主页采集、评论采集、直播、转码、下载代理、永久文件存储或无水印处理。未知混合媒体返回 `UNSUPPORTED_CONTENT`；声明为 Live Photo 但没有合法 MP4 时返回 `MEDIA_NOT_FOUND`，不静态降级为成功。
 
 ## 3. 技术选择
 
@@ -62,7 +62,7 @@
   → 成功缓存 / 同请求合并 / 有界准入
   → 匿名获取笔记页面
   → 提取结构化笔记数据
-  → 规范化图片、视频、封面
+  → 规范化图片、图片关联的 Live Photo MP4、主视频和封面
   → 成功缓存
   → JSON 响应
 
@@ -73,11 +73,11 @@
 
 - Body 只接受 `url` 和可选的 `refresh`；未知字段返回输入错误，避免传入 Cookie 等未支持参数。
 - 请求体上限 8 KiB，URL 上限 4096 字符。一次只接受一个 URL。
-- 精确允许 `www.xiaohongshu.com`、`xiaohongshu.com`、`xhslink.com`；新增主机须有真实样本和测试依据。
+- 精确允许 `www.xiaohongshu.com`、`xiaohongshu.com`、`xhslink.com`、`xhslink.cn`；其中 `.cn` 入口只允许单段 URL-safe token 的 `/o/<token>`。不使用后缀匹配，`.cn` 的子域、相似域名及其他路径均拒绝；新增主机或路径须有真实样本和测试依据。
 - 使用 URL 解析器检查协议、主机、用户信息段和端口；拒绝嵌入用户名密码、IP 字面量、异常端口、非 HTTP(S) 和内网目标。
 - 每次重定向重新校验，最多 3 次；不得验证首个 URL 后无条件跟随到任意主机。DNS 结果须为公网地址，实际连接绑定已检查的解析结果，覆盖 IPv4/IPv6。
 - 分享查询参数原样保留用于请求，不随意去掉 token 或改变编码。缓存身份使用保留访问参数的规范化 URL 摘要；不把秘密参数写入日志。
-- 完整长链接可从路径识别笔记 ID；短链先取得允许范围内的最终详情地址，再确定 ID。
+- 完整长链接可从路径识别笔记 ID；短链先取得允许范围内的最终详情地址，再确定 ID。授权手机样本的脱敏链路为 `xhslink.cn/o/<redacted>` → `www.xiaohongshu.com/discovery/item/<redacted>`，共一次跳转；最终分享查询值原样保留但不记录。
 
 ### 4.2 获取页面
 
@@ -108,7 +108,9 @@ window.__INITIAL_STATE__
 
 图片宽高使用 `source_width`、`source_height`，表示页面元数据。页面可能记录原始尺寸，而实际 CDN 地址返回缩放版本；未读取并解码图片前，不宣称为下载文件的实际尺寸。
 
-**视频：** 从 `video.media.stream` 收集有合法 URL 的 MP4 候选。优先 H.264，同编码中按分辨率、再按码率降序选择；未知值排在已知值之后。只输出一个选中的 MP4，避免多清晰度被误解为多个不同视频。主地址缺失时才考虑同一候选的合法备用地址。只有封面、没有支持的主视频时必须失败。
+**Live Photo：** `livePhoto=true` 或图片条目中存在非空动态 `stream` 时，该图片仍保留在原位置，并增加一个 `live_video`。动态候选与普通视频复用相同的合法主机、MP4 证据、主/备用地址和 H.264/分辨率/码率排序规则。空 `stream` 不会把普通图片误判为 Live Photo。动态宽高、时长和大小只读取选中动态候选自身的字段，不能复制静态图元数据；上游未提供时返回 null。声明为 Live Photo 却没有受支持 MP4 时整篇失败，避免调用方误以为拿到了完整内容。
+
+**视频：** 从 `video.media.stream` 收集有合法 URL 的 MP4 候选。优先 H.264，同编码中按分辨率、再按码率降序选择；未知值排在已知值之后。只输出一个选中的 MP4，避免多清晰度被误解为多个不同视频。每个候选优先使用可证明为 MP4 的合法主地址；主地址缺失、不合法或不能证明为 MP4 时，才按顺序考虑合法备用地址。只有封面、没有支持的主视频时必须失败。
 
 视频尺寸、时长、大小均来自选中流的元数据；毫秒时长转为秒，不把原视频的尺寸填入已转码流。编码、清晰度或大小不确定时返回 null。
 
@@ -133,7 +135,7 @@ window.__INITIAL_STATE__
 
 - 成功信封：`success=true`、`data` 为笔记结果、`error=null`、`meta` 为请求和缓存信息。
 - 失败信封：`success=false`、`data=null`、`error={code,message,retryable}`、`meta` 包含 request_id。
-- `type=image`：`images` 至少 1 项，`videos=[]`，`cover=null`。
+- `type=image`：`images` 至少 1 项，普通图片省略 `live_video`，Live Photo 图片包含一个 `live_video` MP4；`videos=[]`，`cover=null`。
 - `type=video`：`images=[]`，`videos` 恰好 1 项，`cover` 可以为 null。
 - `url_expires_at` 未知时为 null；不得猜测固定 24 小时等期限。
 - `meta.cache.expires_at` 仅为本服务缓存淘汰时间，不保证媒体在这段时间内有效。
@@ -172,7 +174,7 @@ window.__INITIAL_STATE__
 | 404 | NOTE_NOT_FOUND / ROUTE_NOT_FOUND | 明确笔记不存在 / 本站路由不存在 |
 | 405 | METHOD_NOT_ALLOWED | 请求方法不支持 |
 | 413 | INPUT_TOO_LARGE | 请求体超过上限 |
-| 422 | UNSUPPORTED_CONTENT | 实况图等当前未支持类型 |
+| 422 | UNSUPPORTED_CONTENT | 直播或当前无法完整处理的未知混合媒体 |
 | 429 | RATE_LIMITED | 本站调用限流 |
 | 500 | INTERNAL_ERROR | 未预期内部错误 |
 | 502 | UPSTREAM_BAD_RESPONSE / PARSE_FAILED / MEDIA_NOT_FOUND | 上游异常、结构变化或应有媒体缺失 |
@@ -187,7 +189,7 @@ window.__INITIAL_STATE__
 
 ## 8. 当前验证状态与外部验收
 
-Python 3.12 离线验证覆盖 URL/DNS 策略、初始状态读取、图片和视频规范化、统一 API 信封、鉴权、缓存、请求合并、限流、队列、取消、日志脱敏及示例契约。Compose 配置已完成静态校验。由于本机 Docker daemon 未运行，镜像构建、非 root 容器启动和健康检查尚未执行；真实链接、目标 VPS、媒体下载和 HTTPS 同样保持未验证。
+Python 3.12 的 88 项离线测试覆盖 URL/DNS 策略、精确 `.cn` 手机短链路径及相似域拒绝、逐跳安全跳转、初始状态读取、普通图片、多个 Live Photo 和普通视频规范化、统一 API 信封、鉴权、缓存、请求合并、限流、队列、取消、日志脱敏、运行时 OpenAPI 及示例契约。2026-10-18 的授权 Live Photo 样本返回 18 张有序图片、2 个嵌套动态 MP4、空顶层 `videos`；静态图和动态 MP4 各有一个代表性地址完成 1024 字节有界文件头检查，均返回 206，未执行完整下载或播放，输入 token 与媒体 URL 未持久化。同日授权手机短链样本确认一次手动跳转到标准详情页；重建后的本地 API 将其解析为 7 张有序图片、每张都带嵌套 Live Photo MP4、空顶层 `videos`，探测只记录主机、脱敏路径、查询键名及媒体计数。变更后重新执行 Compose 配置校验、镜像构建、容器启动与 `/healthz`；目标 VPS 原生架构与出口、HTTPS、调用方完整媒体下载和回滚演练仍保持未验证。
 
 1. 5 个已知样本取得正确类型和数量，视频封面不计入正文图片。
 2. 页面解析与接口测试使用脱敏夹具，不把每次测试都变成真实平台请求。
@@ -199,6 +201,8 @@ Python 3.12 离线验证覆盖 URL/DNS 策略、初始状态读取、图片和�
 ## 9. 依据
 
 - 本地实测：[匿名验证记录](evidence/anonymous-probe-2026-10-17.json)。
+- Live Photo 实测：[脱敏探测记录](evidence/live-photo-probe-2026-10-18.json)。
+- 手机短链实测：[脱敏跳转记录](evidence/mobile-short-link-probe-2026-10-18.json)。
 - [curl_cffi v0.13.0 浏览器配置源码](https://github.com/lexiforest/curl_cffi/blob/v0.13.0/curl_cffi/requests/impersonate.py)：固定 `chrome136` 基线。
 - [yt-dlp 小红书解析源码](https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/extractor/xiaohongshu.py)：页面结构及媒体字段的参考；本项目仍以真实样本和自身测试为准。
 - [FastAPI 官方容器部署说明](https://fastapi.tiangolo.com/deployment/docker/)：从官方 Python 镜像构建服务。

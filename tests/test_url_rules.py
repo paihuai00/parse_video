@@ -15,11 +15,31 @@ from app.parser.url_rules import ResolvedHop, cache_key, is_public_address, pars
         "https://user:pass@www.xiaohongshu.com/explore/6ad1f8610000000018018eef",
         "https://www.xiaohongshu.com:444/explore/6ad1f8610000000018018eef",
         "https://127.0.0.1/explore/6ad1f8610000000018018eef",
+        "https://xhslink.cn.evil.example/o/example-token",
+        "https://xhslink.com.cn/o/example-token",
+        "https://www.xhslink.cn/o/example-token",
+        "https://xhslink.cn../o/example-token",
+        "https://user:pass@xhslink.cn/o/example-token",
+        "https://127.0.0.1/o/example-token",
+        "https://xhslink.cn:444/o/example-token",
         "file:///etc/passwd",
         "https://www.xiaohongshu.com/explore/not-a-note",
         " https://xhslink.com/a",
         "https://xhslink.com/a\n",
+        "https://xhslink.com/a\x00",
         "https://xhslink.com/a?token=has space",
+        "https://xhslink.cn/",
+        "https://xhslink.cn/example-token",
+        "https://xhslink.cn/o/",
+        "https://xhslink.cn/o/example/token",
+        "https://xhslink.cn/o/example%2Ftoken",
+        "https://xhslink.cn/o/example%2ftoken",
+        "https://xhslink.cn/o/example%5Ctoken",
+        "https://xhslink.cn/o/example\\token",
+        "https://xhslink.cn/o/%2e%2e",
+        "https://xhslink.cn/o/example.token",
+        "https://xhslink.cn/o/短链",
+        "https://xhslink.cn/o/" + "a" * 4096,
     ],
 )
 def test_rejects_unsafe_or_unsupported_urls(url: str) -> None:
@@ -36,11 +56,24 @@ def test_preserves_share_query_and_extracts_note_id() -> None:
     assert value.normalized_url.endswith("?xsec_token=secret&xsec_source=pc_share")
 
 
+def test_accepts_only_the_observed_mobile_short_link_shape() -> None:
+    value = parse_url("https://XHSLINK.CN./o/example_Token-1")
+    assert value.host == "xhslink.cn"
+    assert value.note_id is None
+    assert value.is_short_link
+    assert value.normalized_url == "https://xhslink.cn/o/example_Token-1"
+
+
 def test_cache_identity_includes_access_parameters_without_exposing_them() -> None:
     first = cache_key("https://xhslink.com/a?token=one")
     second = cache_key("https://xhslink.com/a?token=two")
     assert first != second
     assert "one" not in first
+
+    mobile_first = cache_key("https://xhslink.cn/o/example-token?source=one")
+    mobile_second = cache_key("https://xhslink.cn/o/example-token?source=two")
+    assert mobile_first != mobile_second
+    assert "example-token" not in mobile_first
 
 
 def test_public_address_policy() -> None:

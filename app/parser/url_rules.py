@@ -11,9 +11,11 @@ from urllib.parse import SplitResult, urlsplit, urlunsplit
 
 from app.errors import AppError, invalid_url
 
-ALLOWED_HOSTS = frozenset({"www.xiaohongshu.com", "xiaohongshu.com", "xhslink.com"})
+SHORT_LINK_HOSTS = frozenset({"xhslink.com", "xhslink.cn"})
 DETAIL_HOSTS = frozenset({"www.xiaohongshu.com", "xiaohongshu.com"})
+ALLOWED_HOSTS = DETAIL_HOSTS | SHORT_LINK_HOSTS
 NOTE_ID_LENGTH = 24
+SHORT_TOKEN_CHARS = frozenset("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_")
 
 
 @dataclass(frozen=True)
@@ -42,9 +44,13 @@ def _normalized_host(parts: SplitResult) -> str:
     if parts.username is not None or parts.password is not None:
         raise invalid_url("URL credentials are forbidden")
     try:
-        host = (parts.hostname or "").encode("idna").decode("ascii").lower().rstrip(".")
+        host = (parts.hostname or "").encode("idna").decode("ascii").lower()
     except UnicodeError as exc:
         raise invalid_url("invalid hostname") from exc
+    if host.endswith("."):
+        host = host[:-1]
+        if host.endswith("."):
+            raise invalid_url("invalid hostname")
     if not host or host not in ALLOWED_HOSTS:
         raise invalid_url("unsupported host")
     try:
@@ -58,6 +64,17 @@ def _note_id_from_path(host: str, path: str) -> str | None:
     if host == "xhslink.com":
         if path in {"", "/"}:
             raise invalid_url("short link path is missing")
+        return None
+    if host == "xhslink.cn":
+        segments = path.split("/")
+        if (
+            len(segments) != 3
+            or segments[0] != ""
+            or segments[1] != "o"
+            or not segments[2]
+            or any(char not in SHORT_TOKEN_CHARS for char in segments[2])
+        ):
+            raise invalid_url("unsupported short link path")
         return None
     segments = [segment for segment in path.split("/") if segment]
     if len(segments) != 3 and len(segments) != 2:
@@ -80,7 +97,7 @@ def _note_id_from_path(host: str, path: str) -> str | None:
 def parse_url(raw_url: str) -> ParsedUrl:
     if len(raw_url) > 4096:
         raise invalid_url("URL is too long")
-    if any(char.isspace() or ord(char) == 127 for char in raw_url):
+    if any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in raw_url):
         raise invalid_url("URL contains whitespace or control characters")
     try:
         parts = urlsplit(raw_url)
@@ -102,7 +119,7 @@ def parse_url(raw_url: str) -> ParsedUrl:
     note_id = _note_id_from_path(host, parts.path)
     netloc = host if explicit_port is None else f"{host}:{explicit_port}"
     normalized = urlunsplit((scheme, netloc, parts.path, parts.query, ""))
-    return ParsedUrl(normalized, host, expected_port, note_id, host == "xhslink.com")
+    return ParsedUrl(normalized, host, expected_port, note_id, host in SHORT_LINK_HOSTS)
 
 
 def is_public_address(address: str) -> bool:

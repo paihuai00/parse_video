@@ -13,7 +13,7 @@ from referencing.jsonschema import DRAFT202012
 from app.config import Settings
 from app.errors import AppError
 from app.main import create_app
-from app.models import InternalImage, InternalNote
+from app.models import InternalImage, InternalNote, InternalVideo
 from app.services.parse_service import ServiceResult
 
 ROOT = Path(__file__).parents[1]
@@ -38,6 +38,7 @@ def assert_contract(schema_name: str, instance: dict) -> None:
 class FakeService:
     def __init__(self) -> None:
         self.error = None
+        self.live_video: InternalVideo | None = None
 
     async def parse(self, raw_url: str, refresh: bool, api_key: str) -> ServiceResult:
         _ = raw_url, refresh, api_key
@@ -48,7 +49,15 @@ class FakeService:
             "6ad2355f000000001a027848",
             "示例",
             "image",
-            (InternalImage("https://sns-webpic-qc.xhscdn.com/a.webp?sig=x", 10, 20, 1),),
+            (
+                InternalImage(
+                    "https://sns-webpic-qc.xhscdn.com/a.webp?sig=x",
+                    10,
+                    20,
+                    1,
+                    self.live_video,
+                ),
+            ),
             (),
             None,
         )
@@ -80,9 +89,44 @@ def test_success_and_fresh_request_id() -> None:
     second = http.post("/api/v1/xiaohongshu/parse", json=body, headers={"X-API-Key": "test-key"})
     assert first.status_code == 200
     assert first.json()["data"]["images"][0]["verification"] == "not_checked"
+    assert "live_video" not in first.json()["data"]["images"][0]
     assert first.json()["meta"]["request_id"] != second.json()["meta"]["request_id"]
     assert first.headers["x-request-id"] == first.json()["meta"]["request_id"]
     assert_contract("ParseSuccess", first.json())
+
+
+def test_live_photo_video_is_nested_on_its_owning_image() -> None:
+    http, service = client()
+    service.live_video = InternalVideo(
+        "https://sns-video-v6.xhscdn.com/motion.mp4?sig=kept",
+        None,
+        None,
+        "H264",
+        None,
+        None,
+        None,
+    )
+    response = http.post(
+        "/api/v1/xiaohongshu/parse",
+        json={"url": "https://www.xiaohongshu.com/explore/6ad2355f000000001a027848"},
+        headers={"X-API-Key": "test-key"},
+    )
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["videos"] == []
+    assert data["images"][0]["live_video"] == {
+        "url": "https://sns-video-v6.xhscdn.com/motion.mp4?sig=kept",
+        "source_width": None,
+        "source_height": None,
+        "url_expires_at": None,
+        "verification": "not_checked",
+        "format": "mp4",
+        "codec": "H264",
+        "quality": None,
+        "duration_seconds": None,
+        "size_bytes": None,
+    }
+    assert_contract("ParseSuccess", response.json())
 
 
 def test_auth_validation_and_framework_errors_use_envelope() -> None:

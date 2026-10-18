@@ -56,6 +56,32 @@ def check_media(url: str, full_download: bool) -> dict:
         }
 
 
+def representative_media(data: dict) -> list[tuple[str, str]]:
+    images = data.get("images", [])
+    videos = data.get("videos", [])
+    candidates: list[tuple[str, str]] = []
+    motions: list[tuple[str, str]] = []
+    if isinstance(images, list):
+        for item in images:
+            if not isinstance(item, dict):
+                continue
+            if isinstance(item.get("url"), str):
+                candidates.append(("image", item["url"]))
+            live_video = item.get("live_video")
+            if isinstance(live_video, dict) and isinstance(live_video.get("url"), str):
+                motions.append(("live_video", live_video["url"]))
+    if isinstance(videos, list):
+        for item in videos:
+            if isinstance(item, dict) and isinstance(item.get("url"), str):
+                candidates.append(("video", item["url"]))
+    cover = data.get("cover")
+    if isinstance(cover, dict) and isinstance(cover.get("url"), str):
+        candidates.append(("cover", cover["url"]))
+    if motions:
+        return candidates[:1] + motions[:1]
+    return candidates[:2]
+
+
 def redacted_summary(payload: dict, check_headers: bool, full_download: bool) -> dict:
     if not payload.get("success"):
         error = payload.get("error") or {}
@@ -65,20 +91,25 @@ def redacted_summary(payload: dict, check_headers: bool, full_download: bool) ->
             "request_id": (payload.get("meta") or {}).get("request_id"),
         }
     data = payload["data"]
-    media = list(data.get("images", [])) + list(data.get("videos", []))
-    if data.get("cover"):
-        media.append(data["cover"])
+    images = data.get("images", [])
+    live_photo_count = sum(
+        1 for item in images if isinstance(item, dict) and isinstance(item.get("live_video"), dict)
+    )
     result = {
         "success": True,
         "note_id": data.get("note_id"),
         "type": data.get("type"),
-        "image_count": len(data.get("images", [])),
+        "image_count": len(images),
+        "live_photo_count": live_photo_count,
         "video_count": len(data.get("videos", [])),
         "has_cover": data.get("cover") is not None,
         "request_id": payload.get("meta", {}).get("request_id"),
     }
     if check_headers or full_download:
-        result["media_checks"] = [check_media(item["url"], full_download) for item in media[:2]]
+        result["media_checks"] = [
+            {"kind": kind, **check_media(url, full_download)}
+            for kind, url in representative_media(data)
+        ]
         result["media_check_mode"] = "full_download" if full_download else "file_header"
     return result
 

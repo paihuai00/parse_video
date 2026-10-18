@@ -82,19 +82,6 @@ def _image_url(item: dict[str, Any]) -> str | None:
     return None
 
 
-def _has_live_media(note: dict[str, Any]) -> bool:
-    note_type = str(note.get("type", "")).lower()
-    if note_type in {"live", "live_photo", "livephoto"}:
-        return True
-    image_list = note.get("imageList")
-    if not isinstance(image_list, list):
-        return False
-    live_keys = {"livePhoto", "livePhotoUrl", "videoUrl", "stream"}
-    return any(
-        isinstance(item, dict) and any(item.get(key) for key in live_keys) for item in image_list
-    )
-
-
 def _cover_from_images(items: Any) -> InternalCover | None:
     if not isinstance(items, list):
         return None
@@ -109,14 +96,7 @@ def _cover_from_images(items: Any) -> InternalCover | None:
     return None
 
 
-def _stream_candidates(note: dict[str, Any]) -> list[dict[str, Any]]:
-    video = note.get("video")
-    if not isinstance(video, dict):
-        return []
-    media = video.get("media")
-    if not isinstance(media, dict):
-        return []
-    stream = media.get("stream")
+def _stream_candidates(stream: Any) -> list[dict[str, Any]]:
     if not isinstance(stream, dict):
         return []
     candidates: list[dict[str, Any]] = []
@@ -131,17 +111,18 @@ def _stream_candidates(note: dict[str, Any]) -> list[dict[str, Any]]:
     return candidates
 
 
-def _candidate_url(candidate: dict[str, Any]) -> str | None:
+def _candidate_urls(candidate: dict[str, Any]) -> list[str]:
+    urls: list[str] = []
     direct = normalize_media_url(candidate.get("masterUrl"))
     if direct:
-        return direct
+        urls.append(direct)
     backups = candidate.get("backupUrls")
     if isinstance(backups, list):
         for item in backups:
             url = normalize_media_url(item)
-            if url:
-                return url
-    return None
+            if url and url not in urls:
+                urls.append(url)
+    return urls
 
 
 def _codec(candidate: dict[str, Any]) -> str | None:
@@ -184,11 +165,63 @@ def _duration_seconds(candidate: dict[str, Any], note: dict[str, Any]) -> float 
     return float(value) / 1000.0
 
 
+def _selected_video(
+    stream: Any,
+    *,
+    duration_source: dict[str, Any] | None = None,
+) -> InternalVideo | None:
+    valid: list[tuple[dict[str, Any], str]] = []
+    for candidate in _stream_candidates(stream):
+        for url in _candidate_urls(candidate):
+            if _is_mp4(candidate, url):
+                valid.append((candidate, url))
+                break
+    if not valid:
+        return None
+    candidate, url = max(valid, key=lambda item: _rank(item[0]))
+    duration = (
+        _duration_seconds(candidate, duration_source)
+        if duration_source is not None
+        else _duration_seconds(candidate, {})
+    )
+    return InternalVideo(
+        url=url,
+        source_width=_positive_int(candidate.get("width")),
+        source_height=_positive_int(candidate.get("height")),
+        codec=_codec(candidate),
+        quality=_text(candidate.get("qualityType")) or _text(candidate.get("quality")),
+        duration_seconds=duration,
+        size_bytes=_nonnegative_int(candidate.get("size")),
+    )
+
+
+def _normal_video_stream(note: dict[str, Any]) -> Any:
+    video = note.get("video")
+    if not isinstance(video, dict):
+        return None
+    media = video.get("media")
+    return media.get("stream") if isinstance(media, dict) else None
+
+
+def _has_nonempty_stream(value: Any) -> bool:
+    if not isinstance(value, dict):
+        return False
+    return any(isinstance(items, list) and bool(items) for items in value.values())
+
+
+def _is_live_photo(item: dict[str, Any]) -> bool:
+    return (
+        bool(item.get("livePhoto"))
+        or _has_nonempty_stream(item.get("stream"))
+        or any(item.get(key) for key in ("livePhotoUrl", "videoUrl"))
+    )
+
+
 def normalize_note(note_id: str, note: dict[str, Any]) -> InternalNote:
-    if _has_live_media(note):
-        raise AppError("UNSUPPORTED_CONTENT", 422, detail="live media detected")
     title = _text(note.get("title")) or _text(note.get("desc"))
     note_type = str(note.get("type", "normal")).lower()
+    if note_type in {"live", "live_photo", "livephoto"}:
+        raise AppError("UNSUPPORTED_CONTENT", 422, detail="live broadcast or note is unsupported")
     video_payload = note.get("video")
     if isinstance(video_payload, dict) and note_type != "video":
         raise AppError("UNSUPPORTED_CONTENT", 422, detail="mixed media note detected")
@@ -196,23 +229,9 @@ def normalize_note(note_id: str, note: dict[str, Any]) -> InternalNote:
     images = note.get("imageList")
 
     if has_video:
-        valid: list[tuple[dict[str, Any], str]] = []
-        for candidate in _stream_candidates(note):
-            url = _candidate_url(candidate)
-            if url and _is_mp4(candidate, url):
-                valid.append((candidate, url))
-        if not valid:
+        video = _selected_video(_normal_video_stream(note), duration_source=note)
+        if video is None:
             raise AppError("MEDIA_NOT_FOUND", 502, detail="supported main MP4 is missing")
-        candidate, url = max(valid, key=lambda item: _rank(item[0]))
-        video = InternalVideo(
-            url=url,
-            source_width=_positive_int(candidate.get("width")),
-            source_height=_positive_int(candidate.get("height")),
-            codec=_codec(candidate),
-            quality=_text(candidate.get("qualityType")) or _text(candidate.get("quality")),
-            duration_seconds=_duration_seconds(candidate, note),
-            size_bytes=_nonnegative_int(candidate.get("size")),
-        )
         return InternalNote(note_id, title, "video", (), (video,), _cover_from_images(images))
 
     if note_type not in {"normal", "image", ""}:
@@ -222,14 +241,29 @@ def normalize_note(note_id: str, note: dict[str, Any]) -> InternalNote:
         for item in images:
             if not isinstance(item, dict):
                 continue
+            is_live_photo = _is_live_photo(item)
             url = _image_url(item)
+            if is_live_photo and url is None:
+                raise AppError(
+                    "MEDIA_NOT_FOUND", 502, detail="declared Live Photo still image is missing"
+                )
             if url:
+                live_video = None
+                if is_live_photo:
+                    live_video = _selected_video(item.get("stream"))
+                    if live_video is None:
+                        raise AppError(
+                            "MEDIA_NOT_FOUND",
+                            502,
+                            detail="declared Live Photo has no supported MP4",
+                        )
                 normalized_images.append(
                     InternalImage(
                         url,
                         _positive_int(item.get("width")),
                         _positive_int(item.get("height")),
                         len(normalized_images) + 1,
+                        live_video,
                     )
                 )
     if not normalized_images:

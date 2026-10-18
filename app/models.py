@@ -6,22 +6,14 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
-
-
-@dataclass(frozen=True)
-class InternalImage:
-    url: str
-    source_width: int | None
-    source_height: int | None
-    index: int
-
-
-@dataclass(frozen=True)
-class InternalCover:
-    url: str
-    source_width: int | None
-    source_height: int | None
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    HttpUrl,
+    SerializerFunctionWrapHandler,
+    model_serializer,
+)
 
 
 @dataclass(frozen=True)
@@ -33,6 +25,22 @@ class InternalVideo:
     quality: str | None
     duration_seconds: float | None
     size_bytes: int | None
+
+
+@dataclass(frozen=True)
+class InternalImage:
+    url: str
+    source_width: int | None
+    source_height: int | None
+    index: int
+    live_video: InternalVideo | None = None
+
+
+@dataclass(frozen=True)
+class InternalCover:
+    url: str
+    source_width: int | None
+    source_height: int | None
 
 
 @dataclass(frozen=True)
@@ -54,15 +62,6 @@ class ParseRequest(StrictModel):
     refresh: bool = False
 
 
-class ImageMedia(StrictModel):
-    url: HttpUrl
-    source_width: int | None = Field(default=None, ge=1)
-    source_height: int | None = Field(default=None, ge=1)
-    url_expires_at: datetime | None = None
-    verification: Literal["not_checked"] = "not_checked"
-    index: int = Field(ge=1)
-
-
 class CoverMedia(StrictModel):
     url: HttpUrl
     source_width: int | None = Field(default=None, ge=1)
@@ -77,6 +76,29 @@ class VideoMedia(CoverMedia):
     quality: str | None = None
     duration_seconds: float | None = Field(default=None, ge=0)
     size_bytes: int | None = Field(default=None, ge=0)
+
+
+class ImageMedia(StrictModel):
+    url: HttpUrl
+    source_width: int | None = Field(default=None, ge=1)
+    source_height: int | None = Field(default=None, ge=1)
+    url_expires_at: datetime | None = None
+    verification: Literal["not_checked"] = "not_checked"
+    index: int = Field(ge=1)
+    live_video: VideoMedia | None = None
+
+    @model_serializer(mode="wrap")
+    def omit_absent_live_video(  # type: ignore[no-untyped-def]
+        self, handler: SerializerFunctionWrapHandler
+    ):
+        # Leaving the return type unannotated is intentional. Pydantic treats a
+        # concrete dict return annotation as the model's serialization schema,
+        # which would collapse FastAPI's generated ImageMedia schema to a bare
+        # object even though the wire output remains structured.
+        serialized = handler(self)
+        if self.live_video is None:
+            serialized.pop("live_video", None)
+        return serialized
 
 
 class ImageNote(StrictModel):
@@ -146,7 +168,25 @@ def to_public_note(note: InternalNote) -> ImageNote | VideoNote:
                     url=item.url,
                     source_width=item.source_width,
                     source_height=item.source_height,
+                    url_expires_at=None,
+                    verification="not_checked",
                     index=item.index,
+                    live_video=(
+                        VideoMedia(
+                            url=item.live_video.url,
+                            source_width=item.live_video.source_width,
+                            source_height=item.live_video.source_height,
+                            url_expires_at=None,
+                            verification="not_checked",
+                            format="mp4",
+                            codec=item.live_video.codec,
+                            quality=item.live_video.quality,
+                            duration_seconds=item.live_video.duration_seconds,
+                            size_bytes=item.live_video.size_bytes,
+                        )
+                        if item.live_video
+                        else None
+                    ),
                 )
                 for item in note.images
             ],
@@ -159,6 +199,8 @@ def to_public_note(note: InternalNote) -> ImageNote | VideoNote:
             url=note.cover.url,
             source_width=note.cover.source_width,
             source_height=note.cover.source_height,
+            url_expires_at=None,
+            verification="not_checked",
         )
     return VideoNote(
         note_id=note.note_id,
@@ -170,6 +212,9 @@ def to_public_note(note: InternalNote) -> ImageNote | VideoNote:
                 url=item.url,
                 source_width=item.source_width,
                 source_height=item.source_height,
+                url_expires_at=None,
+                verification="not_checked",
+                format="mp4",
                 codec=item.codec,
                 quality=item.quality,
                 duration_seconds=item.duration_seconds,

@@ -6,7 +6,7 @@
 
 Use this contract whenever code changes the HTTP API, upstream URL/transport policy, note parsing, media normalization, process-local resource controls, environment wiring, or deployment proxy. These layers form one observable contract: the caller submits one note URL, the service returns JSON direct URLs, and the caller downloads from the upstream CDN.
 
-The service never proxies, stores, bundles, transcodes, or streams media files. Live-photo/mixed content, login sessions, batch input, and multiple workers remain outside v1.
+The service never proxies, stores, bundles, transcodes, or streams media files. Per-image Live Photo MP4 discovery is supported, while live broadcasts, unrelated mixed top-level image/video payloads, login sessions, batch input, and multiple workers remain outside v1.
 
 ### 2. Signatures
 
@@ -32,6 +32,10 @@ class ParseService:
 
 class XiaohongshuClient:
     async def fetch(self, raw_url: str, deadline: Deadline) -> PageResponse: ...
+
+class ImageMedia(StrictModel):
+    # Omitted from serialized ordinary-image items when None.
+    live_video: VideoMedia | None = None
 ```
 
 ### 3. Contracts
@@ -40,13 +44,14 @@ Request fields:
 
 | Field | Type | Contract |
 | --- | --- | --- |
-| `url` | HTTP(S) URL | At most 4096 characters; exact supported Xiaohongshu host/path after at most three checked redirects; preserve access-significant query values |
+| `url` | HTTP(S) URL | At most 4096 characters; exact detail hosts/paths, `xhslink.com`, or the observed mobile form `xhslink.cn/o/<URL-safe-token>`; at most three checked redirects; preserve access-significant query values |
 | `refresh` | boolean | Defaults to `false`; skips result cache but not authentication, rate, admission, concurrency, or deadline controls |
 
 Success response invariants:
 
 - `success=true`, `error=null`, and a fresh `meta.request_id` for every caller.
-- Image note: ordered non-empty `images`, empty `videos`, `cover=null`.
+- Image note: ordered non-empty `images`, empty top-level `videos`, `cover=null`. Each image may contain one nested `live_video`; ordinary images omit the field entirely.
+- Live Photo: keep the still image at its original image position and attach exactly one positively identified MP4 to that image. Select motion metadata only from the video candidate; never copy still-image width/height onto it.
 - Video note: empty `images`, exactly one positively identified MP4, and an optional separate cover.
 - Every media object uses `verification="not_checked"`; `url_expires_at` stays `null` unless an actual expiry is known.
 - Cache expiry describes only this service's result cache and never promises CDN availability.
@@ -68,6 +73,8 @@ Environment keys:
 
 Upstream connections use `curl_cffi==0.13.0`, explicit `chrome136`, `trust_env=False`, manual redirects, TLS verification, and a fresh anonymous session per parse. Before every hop, validate all resolved addresses as public unicast and replace the session-level `CurlOpt.RESOLVE` entry with the vetted host/port/address set.
 
+Host allowlisting is exact, never suffix-based. ASCII host case and at most one terminal DNS root dot are canonicalized; repeated trailing dots are rejected. `xhslink.cn` is accepted only for `/o/<token>` where the token is one non-empty ASCII URL-safe segment (`A-Z`, `a-z`, `0-9`, `-`, `_`). Its subdomains, lookalikes, encoded slashes or backslashes, dot traversal, extra path segments, Unicode tokens, overlong URLs, and other paths fail before connection. A short-link redirect receives the same host/path, DNS, address, port, TLS, and redirect-budget checks as the initial URL.
+
 ### 4. Validation & Error Matrix
 
 | Condition | HTTP / code |
@@ -78,7 +85,8 @@ Upstream connections use `curl_cffi==0.13.0`, explicit `chrome136`, `trust_env=F
 | Explicit missing note evidence | `404 NOTE_NOT_FOUND` |
 | Unknown route / wrong method | `404 ROUTE_NOT_FOUND` / `405 METHOD_NOT_ALLOWED` |
 | Body over the HTTP input limit | `413 INPUT_TOO_LARGE` |
-| Live-photo or mixed media | `422 UNSUPPORTED_CONTENT` |
+| Live broadcast, unsupported note type, or unrelated top-level mixed image/video payload | `422 UNSUPPORTED_CONTENT` |
+| Declared/equivalent Live Photo missing a valid still or supported MP4 | `502 MEDIA_NOT_FOUND`; never return partial static-only success |
 | Per-key request window exceeded | `429 RATE_LIMITED` with `Retry-After` |
 | Queue full or wait expired | `503 BUSY` with `Retry-After` |
 | Login/challenge/upstream throttle | `503 UPSTREAM_LOGIN_REQUIRED`, `UPSTREAM_ACCESS_RESTRICTED`, or `UPSTREAM_RATE_LIMITED` |
@@ -90,18 +98,18 @@ Every application and framework error uses `ParseError`. Nginx-generated 413/502
 
 ### 5. Good / Base / Bad Cases
 
-- Good: a valid image note returns every ordered body image; a valid video note returns one selected MP4 and a separate cover; a repeated call can return a cache hit with a new request ID.
-- Base: optional title, dimensions, codec, quality, duration, size, and URL expiry may be `null`; a video cover may be absent.
-- Bad: an ambiguous stream without positive MP4 evidence, an unknown CDN host, a private/multicast DNS answer, a login page with HTTP 200, or a mixed image/video payload must fail closed.
+- Good: a valid image note returns every ordered body image, each Live Photo MP4 is nested on its owning image, a valid normal video returns one top-level selected MP4 and a separate cover, and a repeated call can return a cache hit with a new request ID.
+- Base: ordinary image items omit `live_video`; optional title, motion dimensions, codec, quality, duration, size, and URL expiry may be `null`; a normal-video cover may be absent. An empty per-image `stream` alone does not mark an ordinary image as live.
+- Bad: a declared/equivalent Live Photo without positive MP4 evidence, an unknown CDN host, a private/multicast DNS answer, a login page with HTTP 200, or an unrelated mixed top-level image/video payload must fail closed.
 
 ### 6. Tests Required
 
-- Contract: runtime OpenAPI and checked-in `docs/openapi.json` accept the request, success, error, and health examples; unexpected response fields fail.
-- URL/transport: rejected hosts and address classes never reach transport; each redirect installs only the current vetted `CurlOpt.RESOLVE`; environment proxies are disabled; DNS and parsing consume the original deadline; a body above 2 MiB aborts.
-- Parser/media: string-contained `undefined` is preserved, value-token `undefined` becomes null, the requested note ID is selected, image order is stable, MP4 selection is deterministic, unknown CDN/mixed media fail.
+- Contract: runtime OpenAPI and checked-in `docs/openapi.json` accept the request, ordinary-image, Live Photo, normal-video, error, and health examples; `ImageMedia.live_video` remains a structured optional field with `additionalProperties=false`; unexpected response fields fail.
+- URL/transport: rejected hosts and address classes never reach transport; exact `.cn` mobile paths succeed while `.cn` lookalikes/other paths and unsafe redirects fail before connection; each redirect installs only the current vetted `CurlOpt.RESOLVE`; environment proxies are disabled; DNS and parsing consume the original deadline; a body above 2 MiB aborts.
+- Parser/media: string-contained `undefined` is preserved, value-token `undefined` becomes null, the requested note ID is selected, image order and Live Photo ownership are stable, normal and per-image streams share deterministic MP4 selection, empty streams stay ordinary, missing Live Photo MP4 and unknown CDN/mixed media fail.
 - Service: success-only TTL/LRU, refresh bypass, two active leaders, four total waiters including followers, per-caller metadata, orphan cancellation/await, and cleanup on timeout/cancellation.
 - API/logging: authentication variants, 404/405/validation/unexpected errors, no secret-bearing logs, and safe outcome/cache/note/capacity fields.
-- Deployment: `docker compose config --quiet`; build/non-root start/health on an available daemon; real probe only with a user-authorized URL and redacted output.
+- Deployment: `docker compose config --quiet`; build/non-root start/health on an available daemon; real probe only with a user-authorized URL and redacted output. Header checks select at most two representative files and, when Live Photos exist, cover one still plus one nested motion MP4.
 
 ### 7. Wrong vs Correct
 
@@ -125,3 +133,11 @@ response = await session.get(
 Wrong: let same-key followers join shared work without counting them against admission capacity.
 
 Correct: every waiting caller acquires the shared four-place waiter budget; only the upstream leader consumes one of the two active parse slots. When the final waiter leaves, cancel and await orphaned shared work so permits and in-flight entries are released.
+
+Wrong: flatten Live Photo clips into top-level `videos` or return only their still images. Flattening loses the owning image position; static-only success silently drops supported motion content.
+
+Correct: keep image-note `videos=[]`, preserve the ordered still, and attach the selected clip as that image's optional `live_video`. If a marked Live Photo cannot produce both parts, return `MEDIA_NOT_FOUND`.
+
+Wrong: annotate a Pydantic wrap serializer as returning a generic `dict` without checking generated schema. Pydantic may use that annotation as the serialization schema and FastAPI can collapse the model to a bare object.
+
+Correct: keep the serializer's model schema intact and assert at runtime that `ImageMedia` exposes optional structured `live_video` plus `additionalProperties=false`; separately assert ordinary serialization omits the absent field.

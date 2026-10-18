@@ -15,6 +15,7 @@ def test_image_order_and_https_upgrade(fixture_html) -> None:
     assert note.kind == "image"
     assert [image.index for image in note.images] == [1, 2]
     assert note.images[0].url.startswith("https://")
+    assert all(image.live_video is None for image in note.images)
     assert note.cover is None
 
 
@@ -38,13 +39,76 @@ def test_video_without_mp4_fails() -> None:
     assert caught.value.code == "MEDIA_NOT_FOUND"
 
 
-def test_live_photo_is_not_silently_downgraded() -> None:
+def test_live_photos_keep_order_and_pair_one_selected_mp4(fixture_html) -> None:
+    state = decode_initial_state(fixture_html("live_photo_note.html"))
+    note = normalize_note(
+        "aaaaaaaaaaaaaaaaaaaaaaaa", select_note(state, "aaaaaaaaaaaaaaaaaaaaaaaa")
+    )
+    assert note.kind == "image"
+    assert note.videos == ()
+    assert [image.index for image in note.images] == [1, 2, 3, 4]
+    assert [image.live_video is not None for image in note.images] == [False, True, False, True]
+
+    first_motion = note.images[1].live_video
+    assert first_motion is not None
+    assert first_motion.url.endswith("motion-2.mp4?sig=backup-two")
+    assert first_motion.codec == "H264"
+    assert first_motion.source_width is None
+    assert first_motion.source_height is None
+    assert first_motion.duration_seconds is None
+    assert first_motion.size_bytes is None
+
+    second_motion = note.images[3].live_video
+    assert second_motion is not None
+    assert second_motion.url.endswith("motion-4.mp4?sig=master-four")
+    assert second_motion.duration_seconds == 2.4
+    assert second_motion.size_bytes == 34567
+
+
+def test_declared_live_photo_without_supported_mp4_fails_without_static_result() -> None:
     note = {
         "type": "normal",
-        "imageList": [{"urlDefault": "https://a.xhscdn.com/x", "livePhoto": True}],
+        "imageList": [{"urlDefault": "https://sns-webpic-qc.xhscdn.com/x.webp", "livePhoto": True}],
     }
     with pytest.raises(AppError) as caught:
         normalize_note("6ad1f8610000000018018eef", note)
+    assert caught.value.code == "MEDIA_NOT_FOUND"
+
+
+def test_empty_image_stream_does_not_mark_an_ordinary_image_live() -> None:
+    note = {
+        "type": "normal",
+        "imageList": [{"urlDefault": "https://sns-webpic-qc.xhscdn.com/x.webp", "stream": {}}],
+    }
+    result = normalize_note("6ad1f8610000000018018eef", note)
+    assert result.images[0].live_video is None
+
+
+def test_nonempty_image_stream_is_an_equivalent_live_photo_marker() -> None:
+    note = {
+        "type": "normal",
+        "imageList": [
+            {
+                "urlDefault": "https://sns-webpic-qc.xhscdn.com/x.webp",
+                "stream": {
+                    "h264": [
+                        {
+                            "masterUrl": "https://sns-video-v6.xhscdn.com/x.mp4?sig=kept",
+                            "format": "mp4",
+                        }
+                    ]
+                },
+            }
+        ],
+    }
+    result = normalize_note("6ad1f8610000000018018eef", note)
+    assert result.images[0].live_video is not None
+    assert result.images[0].live_video.url.endswith("x.mp4?sig=kept")
+
+
+def test_live_broadcast_note_remains_unsupported() -> None:
+    with pytest.raises(AppError) as caught:
+        normalize_note("6ad1f8610000000018018eef", {"type": "live", "imageList": []})
     assert caught.value.code == "UNSUPPORTED_CONTENT"
 
 
@@ -78,6 +142,27 @@ def test_video_requires_positive_mp4_evidence() -> None:
     with pytest.raises(AppError) as caught:
         normalize_note("6ad1f8610000000018018eef", note)
     assert caught.value.code == "MEDIA_NOT_FOUND"
+
+
+def test_video_uses_supported_backup_when_master_is_not_mp4() -> None:
+    note = {
+        "type": "video",
+        "video": {
+            "media": {
+                "stream": {
+                    "h264": [
+                        {
+                            "masterUrl": "https://sns-video-v6.xhscdn.com/a.m3u8?sig=master",
+                            "backupUrls": ["https://sns-video-v6.xhscdn.com/a.mp4?sig=backup"],
+                            "videoCodec": "H264",
+                        }
+                    ]
+                }
+            }
+        },
+    }
+    result = normalize_note("6ad1f8610000000018018eef", note)
+    assert result.videos[0].url.endswith("a.mp4?sig=backup")
 
 
 def test_mixed_normal_note_with_video_payload_is_rejected() -> None:

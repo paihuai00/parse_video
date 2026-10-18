@@ -1,0 +1,49 @@
+{
+  "success": true,
+  "data": {
+    "note_id": "aaaaaaaaaaaaaaaaaaaaaaaa",
+    "title": "实况图示例",
+    "type": "image",
+    "images": [
+      {
+        "url": "https://media.example.com/still-1.jpg",
+        "source_width": 1080,
+        "source_height": 1440,
+        "url_expires_at": null,
+        "verification": "not_checked",
+        "index": 1
+      },
+      {
+        "url": "https://media.example.com/still-2.jpg",
+        "source_width": 1080,
+        "source_height": 1440,
+        "url_expires_at": null,
+        "verification": "not_checked",
+        "index": 2,
+        "live_video": {
+          "url": "https://media.example.com/motion-2.mp4",
+          "source_width": null,
+          "source_height": null,
+          "url_expires_at": null,
+          "verification": "not_checked",
+          "format": "mp4",
+          "codec": "H264",
+          "quality": null,
+          "duration_seconds": null,
+          "size_bytes": null
+        }
+      }
+    ],
+    "videos": [],
+    "cover": null
+  },
+  "error": null,
+  "meta": {
+    "request_id": "ab747b65-9bf1-4256-980c-a70c562b28f8",
+    "parsed_at": "2026-10-18T08:00:00Z",
+    "cache": {
+      "hit": false,
+      "expires_at": "2026-10-18T08:02:00Z"
+    }
+  }
+}

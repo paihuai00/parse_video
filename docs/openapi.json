@@ -4,7 +4,7 @@
   "info": {
     "title": "小红书媒体解析 API",
     "version": "0.1.0",
-    "description": "面向小流量单机 VPS：调用方提供单个小红书链接，服务匿名获取页面并返回图片或主视频 MP4 直链，不使用小红书账号登录。X-API-Key 是本站调用密钥，与小红书账号、密码及 Cookie 无关。仅缓存成功结果，默认 TTL 120 秒。v1 不代理下载、不上传媒体、不验证媒体文件内容；媒体源尺寸等字段来自网页元数据。所有示例 media.example.com URL 都是占位地址。框架与反向代理可控制的错误响应均应为 application/json；网络断连等无 HTTP 响应的情形不在 JSON 保证范围。"
+    "description": "面向小流量单机 VPS：调用方提供单个小红书链接，服务匿名获取页面并返回有序图片（每张可带对应实况 MP4）或普通视频笔记的一个主视频 MP4 直链，不使用小红书账号登录。X-API-Key 是本站调用密钥，与小红书账号、密码及 Cookie 无关。仅缓存成功结果，默认 TTL 120 秒。v1 不代理下载、不上传媒体、不验证媒体文件内容；媒体源尺寸等字段来自网页元数据。所有示例 media.example.com URL 都是占位地址。框架与反向代理可控制的错误响应均应为 application/json；网络断连等无 HTTP 响应的情形不在 JSON 保证范围。"
   },
   "security": [
     {
@@ -16,7 +16,7 @@
       "post": {
         "operationId": "parseXiaohongshuNote",
         "summary": "解析单个小红书笔记的图片或 MP4 直链",
-        "description": "接受完整长链接或 xhslink.com 短链，保留分享参数。短链解析后仍需校验目标域名、路径和笔记 ID。整段分享文案、批量链接、登录受限内容和不受支持的媒体类型不在 v1 成功范围内。请求必须携带本站 X-API-Key。",
+        "description": "接受完整长链接、xhslink.com 短链或手机复制的 xhslink.cn/o/<token> 短链，保留分享参数。短链解析后仍需校验目标域名、路径和笔记 ID；xhslink.cn 的相似域名、子域及其他路径不受支持。图文中的实况图以静态图片及其嵌套 live_video 返回；顶层 videos 仍只用于普通视频笔记。整段分享文案、批量链接、登录受限内容和不受支持的媒体类型不在 v1 成功范围内。请求必须携带本站 X-API-Key。",
         "security": [
           {
             "ApiKeyAuth": []
@@ -92,6 +92,49 @@
                         "cache": {
                           "hit": false,
                           "expires_at": "2026-10-17T08:02:00Z"
+                        }
+                      }
+                    }
+                  },
+                  "live_photo": {
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "note_id": "aaaaaaaaaaaaaaaaaaaaaaaa",
+                        "title": "实况图示例",
+                        "type": "image",
+                        "images": [
+                          {
+                            "url": "https://media.example.com/still-1.jpg",
+                            "source_width": 1080,
+                            "source_height": 1440,
+                            "url_expires_at": null,
+                            "verification": "not_checked",
+                            "index": 1,
+                            "live_video": {
+                              "url": "https://media.example.com/motion-1.mp4",
+                              "source_width": null,
+                              "source_height": null,
+                              "url_expires_at": null,
+                              "verification": "not_checked",
+                              "format": "mp4",
+                              "codec": "H264",
+                              "quality": null,
+                              "duration_seconds": null,
+                              "size_bytes": null
+                            }
+                          }
+                        ],
+                        "videos": [],
+                        "cover": null
+                      },
+                      "error": null,
+                      "meta": {
+                        "request_id": "ab747b65-9bf1-4256-980c-a70c562b28f8",
+                        "parsed_at": "2026-10-18T08:00:00Z",
+                        "cache": {
+                          "hit": false,
+                          "expires_at": "2026-10-18T08:02:00Z"
                         }
                       }
                     }
@@ -229,7 +272,7 @@
             "format": "uri",
             "pattern": "^https?://",
             "maxLength": 4096,
-            "description": "单个完整 HTTP(S) 小红书笔记链接。计划支持 www.xiaohongshu.com/discovery/item/{note_id}、www.xiaohongshu.com/explore/{note_id} 和 xhslink.com 短链。保留 xsec_token 等分享参数。不接受整段分享文案、链接数组或任意站点 URL。",
+            "description": "单个完整 HTTP(S) 小红书笔记链接。支持 www.xiaohongshu.com/discovery/item/{note_id}、www.xiaohongshu.com/explore/{note_id}、xhslink.com 短链和手机复制的精确 xhslink.cn/o/<token>。保留 xsec_token 等分享参数。不接受整段分享文案、链接数组、xhslink.cn 的其他路径或任意站点 URL。",
             "examples": [
               "https://www.xiaohongshu.com/explore/6ad1f8610000000018018eef?xsec_token=EXAMPLE_TOKEN&xsec_source=pc_share"
             ]
@@ -292,6 +335,17 @@
             "type": "integer",
             "minimum": 1,
             "description": "正文图片在笔记中的顺序，从 1 开始，连续递增。"
+          },
+          "live_video": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/VideoMedia"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "该图片为实况图时选中的动态 MP4；与当前图片位置绑定。普通图片省略此字段。动态流未提供的元数据为 null，不能从静态图宽高推断。"
           }
         }
       },
@@ -465,7 +519,7 @@
             "items": {
               "$ref": "#/components/schemas/ImageMedia"
             },
-            "description": "全部受支持的正文静态图片，按原笔记顺序排列。实况图不得静态降级为成功。"
+            "description": "全部正文静态图片按原笔记顺序排列。实况图在所属图片的 live_video 中带一个选中的 MP4；缺少受支持动态 MP4 时不得静态降级为成功。"
           },
           "videos": {
             "type": "array",
@@ -478,7 +532,7 @@
             "type": "null"
           }
         },
-        "description": "普通静态图文；images 至少有一项，videos 为空，cover 为 null。"
+        "description": "普通图文或包含实况图的图文；images 至少有一项，实况动态 MP4 只嵌套在所属图片，videos 为空，cover 为 null。"
       },
       "VideoNote": {
         "type": "object",
@@ -552,7 +606,7 @@
             "video": "#/components/schemas/VideoNote"
           }
         },
-        "description": "v1 仅支持普通静态图文和单主视频。实况图、无法完整处理的混合媒体返回 UNSUPPORTED_CONTENT。"
+        "description": "v1 支持普通图文、带嵌套动态 MP4 的实况图文和单主视频；不支持的直播或未知混合媒体返回 UNSUPPORTED_CONTENT。"
       },
       "CacheMetadata": {
         "type": "object",
@@ -893,7 +947,7 @@
         }
       },
       "Error422": {
-        "description": "实况图或当前无法完整处理的其他媒体类型；不返回残缺成功结果。",
+        "description": "直播或当前无法完整处理的未知混合媒体类型；不返回残缺成功结果。实况图已支持，但缺少受支持动态 MP4 时返回 MEDIA_NOT_FOUND。",
         "content": {
           "application/json": {
             "schema": {

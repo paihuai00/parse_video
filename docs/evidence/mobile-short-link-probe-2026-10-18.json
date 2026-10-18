@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-10-18",
+  "scope": "One user-authorized mobile-copy short link; redirect-shape probe followed by a redacted parse through the rebuilt local API.",
+  "input": {
+    "host": "xhslink.cn",
+    "path_shape": "/o/<redacted>",
+    "query_present": false
+  },
+  "result": {
+    "success": true,
+    "redirect_count": 1,
+    "hops": [
+      {
+        "host": "xhslink.cn",
+        "path_shape": "/o/<redacted>",
+        "query_keys": []
+      },
+      {
+        "host": "www.xiaohongshu.com",
+        "path_shape": "/discovery/item/<redacted>",
+        "query_keys": [
+          "app_platform",
+          "app_version",
+          "apptime",
+          "author_share",
+          "shareRedId",
+          "share_from_user_hidden",
+          "share_id",
+          "track_code",
+          "type",
+          "xhsshare",
+          "xsec_source",
+          "xsec_token"
+        ]
+      }
+    ],
+    "final_html_nonempty": true,
+    "parse": {
+      "success": true,
+      "type": "image",
+      "image_count": 7,
+      "live_photo_count": 7,
+      "video_count": 0,
+      "has_cover": false
+    }
+  },
+  "security_controls": [
+    "Redirects disabled in the HTTP client and followed manually.",
+    "Every hop resolved separately and required only public-unicast answers.",
+    "Each connection used CurlOpt.RESOLVE with the vetted address set.",
+    "TLS certificate and hostname verification remained enabled.",
+    "The existing three-redirect and total-deadline limits remained active."
+  ],
+  "redaction": {
+    "input_token_persisted": false,
+    "query_values_persisted": false,
+    "note_id_persisted": false,
+    "request_id_persisted": false,
+    "media_urls_persisted": false,
+    "html_persisted": false
+  },
+  "limitations": [
+    "This single sample establishes only the observed host/path and redirect shape.",
+    "It does not establish availability for every short token, VPS egress, or caller network.",
+    "Media file-header checks, full downloads, and playback were not part of this probe."
+  ]
+}
