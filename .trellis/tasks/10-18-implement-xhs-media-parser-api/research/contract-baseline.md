@@ -25,6 +25,7 @@ The caller sends one supported Xiaohongshu URL to `POST /api/v1/xiaohongshu/pars
 - Native `content_callback` collection provides a path to abort decompressed HTML above 2 MiB. The callback-abort mapping must be tested against the pinned release.
 - Synthetic/sanitized fixtures can cover deterministic parser semantics. A user-authorized sample confirmed that per-image Live Photo streams can contain an allowed-host H.264-group MP4 master plus backup, but the input token and returned media URLs must not be persisted. Broader real-world upstream compatibility still requires opt-in live probing.
 - A user-authorized phone-copy sample confirmed the minimal additional entry point: exact `xhslink.cn/o/<token>` redirects once to exact `www.xiaohongshu.com/discovery/item/<note_id>` while carrying access-significant share parameters. The rebuilt API then parsed 7 ordered images with 7 paired Live Photo MP4s and empty top-level videos. The token, parameter values, note ID, request ID, HTML, and media URLs are not retained. This evidence supports only that exact host/path form, not suffix matching or arbitrary `.cn` routes.
+- A later VPS run of that mobile-copy shape found the same 7-image/7-motion structure, but the returned motion candidates used the exact hosts `sns-video-v28.xhscdn.com`, `sns-bak-v11.xhscdn.com`, and `sns-bak-v10.xhscdn.com`. These hosts were added to the exact media allowlist with regression coverage; arbitrary `*.xhscdn.com` remains rejected. No token, signed URL, HTML, API key, or server address was retained.
 
 ## Delivery constraints
 

@@ -116,7 +116,7 @@ window.__INITIAL_STATE__
 
 **封面：** 视频的 `imageList` 作为封面来源，单独放到 `cover`，正文 `images=[]`。图文 `cover=null`，调用方可使用第一张正文图。
 
-**协议和主机：** 返回通过格式及 CDN 主机校验的地址。当前精确允许已实测的 `sns-webpic-qc.xhscdn.com`、`sns-video-v6.xhscdn.com`；其他子域不会仅因后缀相同而自动信任。新增 CDN 主机/协议行为应先取得样本并加入回归。保留全部签名参数，不拼造未出现的资源路径。
+**协议和主机：** 返回通过格式及 CDN 主机校验的地址。当前精确允许已实测的 `sns-webpic-qc.xhscdn.com`、`sns-video-v6.xhscdn.com`、`sns-video-v28.xhscdn.com`、`sns-bak-v11.xhscdn.com` 和 `sns-bak-v10.xhscdn.com`；其他子域不会仅因后缀相同而自动信任。新增 CDN 主机/协议行为应先取得样本并加入回归。保留全部签名参数，不拼造未出现的资源路径。
 
 ## 5. JSON 契约与直链语义
 

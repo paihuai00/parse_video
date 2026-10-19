@@ -173,6 +173,10 @@ location /api/v1/xiaohongshu/ {
 
 ## 5. VPS 与调用方两端验收
 
+### 5.1 已记录的 VPS Live Photo case（2026-10-19）
+
+一次用户授权的手机复制短链在 VPS 上成功跳转到标准详情页并返回 7 张有序图片；7 张图片均带有 Live Photo 的 H.264 动态流，顶层 `videos` 为空。该 VPS 样本使用了此前本地样本未出现的精确媒体主机：`sns-video-v28.xhscdn.com`、`sns-bak-v11.xhscdn.com`、`sns-bak-v10.xhscdn.com`。这些主机已加入精确白名单并有回归测试；不扩展为任意 `*.xhscdn.com`。记录未保存分享令牌、签名媒体 URL、HTML 或 API 密钥。
+
 本地匿名解析成功不代表任意 VPS 出口都成功。至少用现有图文、视频样本完成以下检查，并记录镜像版本、网络环境、时间和结果；不要在记录中保留敏感令牌。
 
 1. **应用状态：** 缺少密钥时拒绝启动；错误密钥拒绝解析；`/healthz` 能独立响应。
