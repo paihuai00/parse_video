@@ -11,6 +11,9 @@ from app.models import InternalCover, InternalImage, InternalNote, InternalVideo
 ALLOWED_MEDIA_HOSTS = frozenset(
     {
         "sns-video-v6.xhscdn.com",
+        "sns-video-v28.xhscdn.com",
+        "sns-bak-v11.xhscdn.com",
+        "sns-bak-v10.xhscdn.com",
         "sns-webpic-qc.xhscdn.com",
     }
 )

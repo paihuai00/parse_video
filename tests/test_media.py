@@ -121,6 +121,14 @@ def test_media_url_host_is_fail_closed() -> None:
         normalize_media_url("https://sns-video-v6.xhscdn.com/video.mp4?token=keep")
         == "https://sns-video-v6.xhscdn.com/video.mp4?token=keep"
     )
+    for host in (
+        "sns-video-v28.xhscdn.com",
+        "sns-bak-v11.xhscdn.com",
+        "sns-bak-v10.xhscdn.com",
+    ):
+        assert normalize_media_url(f"https://{host}/video.mp4?token=keep") == (
+            f"https://{host}/video.mp4?token=keep"
+        )
 
 
 def test_video_requires_positive_mp4_evidence() -> None:
