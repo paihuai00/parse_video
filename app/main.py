@@ -32,7 +32,7 @@ def create_app(
     configure_logging()
     resolved_settings = settings or Settings.from_env()
     app = FastAPI(
-        title="小红书媒体解析 API",
+        title="小红书与抖音媒体解析 API",
         version="0.1.0",
         docs_url=None,
         redoc_url=None,

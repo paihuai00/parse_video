@@ -11,6 +11,6 @@ python -m compileall app tests scripts
 python -m json.tool docs/openapi.json >/dev/null
 ```
 
-Tests use sanitized offline fixtures and fakes. Routine tests never call Xiaohongshu. URL tests stop rejected targets before transport, concurrency tests use fake clients, and checked-in examples are validated against OpenAPI. A real probe requires a user-supplied authorized URL and outputs only a redacted summary.
+Tests use sanitized offline fixtures and fakes. Routine tests never call Xiaohongshu or Douyin. URL tests stop rejected targets before transport, concurrency tests use fake adapters, and checked-in examples are validated against OpenAPI. A real probe requires a user-supplied authorized URL and outputs only a redacted summary. Real Douyin acceptance uses a fresh anonymous browser context and separately checks representative media with an anonymous, bounded client; short-link tokens, real work IDs, cookies, and signed media URLs are never committed.
 
-Forbidden patterns include automatic redirects, executing page JavaScript, unbounded response/cache/queue/retry behavior, committed live secrets, and multiple workers without redesigning process-local coordination.
+Forbidden patterns include automatic redirects in the HTTP client; executing page JavaScript outside the controlled Douyin browser acquisition boundary; unbounded browser requests, script state, proxy tunnels, response/cache/queue/retry behavior; committed live secrets or sample identifiers; and multiple workers without redesigning process-local coordination. The controlled browser must use exact egress hosts, public-address DNS validation with pinned connections, a fresh context, the original request deadline, and deterministic cancellation/cleanup tests.

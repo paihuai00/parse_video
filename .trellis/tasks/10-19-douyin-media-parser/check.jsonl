@@ -1,0 +1,13 @@
+{"file": ".trellis/spec/backend/service-contract.md", "reason": "Preserve existing API, transport and bounded resource contracts."}
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "Maintain parser/service/API ownership."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Offline tests, contract checks and redacted probes."}
+{"file": "docs/douyin/reuse-analysis.md", "reason": "Verified code evidence and compatibility impacts."}
+{"file": "docs/douyin/technical-design.md", "reason": "Approved routing choice and proposed adapter/media contracts."}
+{"file": "docs/douyin/sample-analysis.md", "reason": "Observed probe limitations and feasibility gates."}
+{"file": ".trellis/tasks/10-19-douyin-media-parser/research/upstream-options.md", "reason": "Primary-source observations from open-source parsers, candidate schemas and evidence limits."}
+{"file": "docs/douyin/retry-verification-2026-10-19.md", "reason": "Historical HTTP retry evidence; superseded by the latest P0 data-loading report."}
+{"file": "docs/douyin/implementation-plan.md", "reason": "Executable P0 implementation and evidence gates, then shared service, adapter integration, API and deployment acceptance."}
+{"file": ".trellis/tasks/10-19-douyin-media-parser/research/planning-review.md", "reason": "Historical review: completeness, media access and compatibility concerns; no-browser premise superseded by the 2026-10-20 decision."}
+{"file": "docs/douyin/p0-data-loading-2026-10-19.md", "reason": "Latest evidence: bootstrap itemId match, async data loading, HTTP business failures, browser media and independent bounded reads; P0 remains incomplete."}
+{"file": "docs/douyin/delivery-plan.md", "reason": "User-accepted browser acquisition candidate and real-parsing-first delivery plan; remaining technical acceptance and deployment gates."}
+{"file": ".trellis/tasks/10-19-douyin-media-parser/research/planning-convergence-2026-10-20.md", "reason": "Planning convergence: no open user decisions; accepted browser scope, engineering validation items, and consistent executable P0."}

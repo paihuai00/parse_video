@@ -25,6 +25,19 @@ MESSAGES = {
     "UPSTREAM_TIMEOUT": "获取或解析小红书页面超时。",
 }
 
+UNIFIED_MESSAGES = {
+    **MESSAGES,
+    "INVALID_URL": "链接不是受支持的小红书或抖音作品地址。",
+    "NOTE_NOT_FOUND": "目标作品不存在或已不可见。",
+    "UNSUPPORTED_CONTENT": "该作品包含当前版本不支持的媒体类型。",
+    "UPSTREAM_BAD_RESPONSE": "内容平台返回了无法处理的响应。",
+    "MEDIA_NOT_FOUND": "作品中没有找到受支持的媒体。",
+    "UPSTREAM_LOGIN_REQUIRED": "内容平台当前要求登录，无法匿名获取该作品。",
+    "UPSTREAM_ACCESS_RESTRICTED": "内容平台要求完成访问验证。",
+    "UPSTREAM_RATE_LIMITED": "内容平台暂时限制了访问频率。",
+    "UPSTREAM_TIMEOUT": "获取或解析作品页面超时。",
+}
+
 
 @dataclass
 class AppError(Exception):

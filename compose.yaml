@@ -10,10 +10,14 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     restart: unless-stopped
+    init: true
     mem_limit: 512m
+    pids_limit: 256
+    security_opt:
+      - seccomp=./deploy/chromium-seccomp.json
     read_only: true
     tmpfs:
-      - /tmp:size=64m,mode=1777
+      - /tmp:size=64m,mode=1777,noexec,nosuid
     logging:
       driver: json-file
       options:

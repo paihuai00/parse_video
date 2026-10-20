@@ -2,7 +2,7 @@
 
 ## Overview
 
-This repository is a Python 3.12 FastAPI service. It has no database, frontend, browser process, or distributed runtime. Public behavior is anchored by `docs/openapi.json`; parsing and upstream details stay behind service and parser boundaries.
+This repository is a Python 3.12 FastAPI service. It has no database, frontend, or distributed runtime. Xiaohongshu uses a bounded HTTP client; Douyin uses a per-parse, anonymous, sandboxed Chromium process behind a loopback CONNECT proxy. Public behavior is anchored by `docs/openapi.json`; parsing and upstream details stay behind service and parser boundaries.
 
 ## Guidelines Index
 

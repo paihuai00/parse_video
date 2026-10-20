@@ -122,6 +122,27 @@ class VideoNote(StrictModel):
 ParsedNote = Annotated[ImageNote | VideoNote, Field(discriminator="type")]
 
 
+class UnifiedImageNote(StrictModel):
+    note_id: str = Field(pattern=r"^(?:[0-9a-fA-F]{24}|[0-9]{18,20})$")
+    title: str | None
+    type: Literal["image"]
+    images: list[ImageMedia] = Field(min_length=1)
+    videos: list[VideoMedia] = Field(max_length=0)
+    cover: None
+
+
+class UnifiedVideoNote(StrictModel):
+    note_id: str = Field(pattern=r"^(?:[0-9a-fA-F]{24}|[0-9]{18,20})$")
+    title: str | None
+    type: Literal["video"]
+    images: list[ImageMedia] = Field(max_length=0)
+    videos: list[VideoMedia] = Field(min_length=1, max_length=1)
+    cover: CoverMedia | None
+
+
+UnifiedParsedNote = Annotated[UnifiedImageNote | UnifiedVideoNote, Field(discriminator="type")]
+
+
 class CacheMetadata(StrictModel):
     hit: bool
     expires_at: datetime
@@ -146,6 +167,13 @@ class ParseSuccess(StrictModel):
     meta: ResponseMeta
 
 
+class UnifiedParseSuccess(StrictModel):
+    success: Literal[True] = True
+    data: UnifiedParsedNote
+    error: None = None
+    meta: ResponseMeta
+
+
 class ParseError(StrictModel):
     success: Literal[False] = False
     data: None = None
@@ -158,41 +186,92 @@ class HealthResponse(StrictModel):
 
 
 def to_public_note(note: InternalNote) -> ImageNote | VideoNote:
+    images, videos, cover = _to_public_components(note)
     if note.kind == "image":
         return ImageNote(
             note_id=note.note_id,
             title=note.title,
             type="image",
-            images=[
-                ImageMedia(
-                    url=item.url,
-                    source_width=item.source_width,
-                    source_height=item.source_height,
-                    url_expires_at=None,
-                    verification="not_checked",
-                    index=item.index,
-                    live_video=(
-                        VideoMedia(
-                            url=item.live_video.url,
-                            source_width=item.live_video.source_width,
-                            source_height=item.live_video.source_height,
-                            url_expires_at=None,
-                            verification="not_checked",
-                            format="mp4",
-                            codec=item.live_video.codec,
-                            quality=item.live_video.quality,
-                            duration_seconds=item.live_video.duration_seconds,
-                            size_bytes=item.live_video.size_bytes,
-                        )
-                        if item.live_video
-                        else None
-                    ),
-                )
-                for item in note.images
-            ],
+            images=images,
             videos=[],
             cover=None,
         )
+    return VideoNote(
+        note_id=note.note_id,
+        title=note.title,
+        type="video",
+        images=[],
+        videos=videos,
+        cover=cover,
+    )
+
+
+def to_unified_public_note(note: InternalNote) -> UnifiedImageNote | UnifiedVideoNote:
+    public = _to_public_components(note)
+    if note.kind == "image":
+        return UnifiedImageNote(
+            note_id=note.note_id,
+            title=note.title,
+            type="image",
+            images=public[0],
+            videos=[],
+            cover=None,
+        )
+    return UnifiedVideoNote(
+        note_id=note.note_id,
+        title=note.title,
+        type="video",
+        images=[],
+        videos=public[1],
+        cover=public[2],
+    )
+
+
+def _to_public_components(
+    note: InternalNote,
+) -> tuple[list[ImageMedia], list[VideoMedia], CoverMedia | None]:
+    images = [
+        ImageMedia(
+            url=item.url,
+            source_width=item.source_width,
+            source_height=item.source_height,
+            url_expires_at=None,
+            verification="not_checked",
+            index=item.index,
+            live_video=(
+                VideoMedia(
+                    url=item.live_video.url,
+                    source_width=item.live_video.source_width,
+                    source_height=item.live_video.source_height,
+                    url_expires_at=None,
+                    verification="not_checked",
+                    format="mp4",
+                    codec=item.live_video.codec,
+                    quality=item.live_video.quality,
+                    duration_seconds=item.live_video.duration_seconds,
+                    size_bytes=item.live_video.size_bytes,
+                )
+                if item.live_video
+                else None
+            ),
+        )
+        for item in note.images
+    ]
+    videos = [
+        VideoMedia(
+            url=item.url,
+            source_width=item.source_width,
+            source_height=item.source_height,
+            url_expires_at=None,
+            verification="not_checked",
+            format="mp4",
+            codec=item.codec,
+            quality=item.quality,
+            duration_seconds=item.duration_seconds,
+            size_bytes=item.size_bytes,
+        )
+        for item in note.videos
+    ]
     cover = None
     if note.cover:
         cover = CoverMedia(
@@ -202,25 +281,4 @@ def to_public_note(note: InternalNote) -> ImageNote | VideoNote:
             url_expires_at=None,
             verification="not_checked",
         )
-    return VideoNote(
-        note_id=note.note_id,
-        title=note.title,
-        type="video",
-        images=[],
-        videos=[
-            VideoMedia(
-                url=item.url,
-                source_width=item.source_width,
-                source_height=item.source_height,
-                url_expires_at=None,
-                verification="not_checked",
-                format="mp4",
-                codec=item.codec,
-                quality=item.quality,
-                duration_seconds=item.duration_seconds,
-                size_bytes=item.size_bytes,
-            )
-            for item in note.videos
-        ],
-        cover=cover,
-    )
+    return images, videos, cover

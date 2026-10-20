@@ -14,6 +14,7 @@ from app.config import Settings
 from app.errors import AppError
 from app.main import create_app
 from app.models import InternalImage, InternalNote, InternalVideo
+from app.parser.adapters import Platform
 from app.services.parse_service import ServiceResult
 
 ROOT = Path(__file__).parents[1]
@@ -39,19 +40,33 @@ class FakeService:
     def __init__(self) -> None:
         self.error = None
         self.live_video: InternalVideo | None = None
+        self.last_platform: Platform | None = None
 
-    async def parse(self, raw_url: str, refresh: bool, api_key: str) -> ServiceResult:
+    async def parse(
+        self,
+        raw_url: str,
+        refresh: bool,
+        api_key: str,
+        platform: Platform = "xiaohongshu",
+    ) -> ServiceResult:
         _ = raw_url, refresh, api_key
+        self.last_platform = platform
         if self.error:
             raise self.error
         now = datetime.now(UTC)
+        note_id = "7000000000000000002" if platform == "douyin" else "6ad2355f000000001a027848"
+        image_url = (
+            "https://p3-pc-sign.douyinpic.com/a.webp?sig=x"
+            if platform == "douyin"
+            else "https://sns-webpic-qc.xhscdn.com/a.webp?sig=x"
+        )
         note = InternalNote(
-            "6ad2355f000000001a027848",
+            note_id,
             "示例",
             "image",
             (
                 InternalImage(
-                    "https://sns-webpic-qc.xhscdn.com/a.webp?sig=x",
+                    image_url,
                     10,
                     20,
                     1,
@@ -127,6 +142,31 @@ def test_live_photo_video_is_nested_on_its_owning_image() -> None:
         "size_bytes": None,
     }
     assert_contract("ParseSuccess", response.json())
+
+
+def test_unified_route_detects_douyin_and_accepts_decimal_id() -> None:
+    http, service = client()
+    response = http.post(
+        "/api/v1/parse",
+        json={"url": "https://v.douyin.com/exampleToken/"},
+        headers={"X-API-Key": "test-key"},
+    )
+    assert response.status_code == 200
+    assert service.last_platform == "douyin"
+    assert response.json()["data"]["note_id"] == "7000000000000000002"
+    assert "live_video" not in response.json()["data"]["images"][0]
+
+
+def test_unified_route_uses_generic_platform_error_message() -> None:
+    http, service = client()
+    service.error = AppError("UPSTREAM_TIMEOUT", 504, True, "test")
+    response = http.post(
+        "/api/v1/parse",
+        json={"url": "https://v.douyin.com/exampleToken/"},
+        headers={"X-API-Key": "test-key"},
+    )
+    assert response.status_code == 504
+    assert response.json()["error"]["message"] == "获取或解析作品页面超时。"
 
 
 def test_auth_validation_and_framework_errors_use_envelope() -> None:

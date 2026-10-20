@@ -37,7 +37,11 @@ def test_checked_in_examples_match_openapi_schemas() -> None:
 
 def test_contract_has_exact_public_routes() -> None:
     contract = json.loads((ROOT / "docs/openapi.json").read_text(encoding="utf-8"))
-    assert set(contract["paths"]) == {"/healthz", "/api/v1/xiaohongshu/parse"}
+    assert set(contract["paths"]) == {
+        "/healthz",
+        "/api/v1/parse",
+        "/api/v1/xiaohongshu/parse",
+    }
 
 
 def test_runtime_openapi_keeps_the_structured_optional_live_video_schema() -> None:
@@ -60,6 +64,23 @@ def test_checked_in_success_examples_match_the_public_schema() -> None:
     examples = contract["paths"]["/api/v1/xiaohongshu/parse"]["post"]["responses"]["200"][
         "content"
     ]["application/json"]["examples"]
+    for name, example in examples.items():
+        errors = list(Draft202012Validator(schema, registry=registry).iter_errors(example["value"]))
+        assert errors == [], f"{name}: {errors}"
+
+
+def test_unified_success_examples_match_decimal_id_schema() -> None:
+    contract = json.loads((ROOT / "docs/openapi.json").read_text(encoding="utf-8"))
+    contract_id = "https://local.invalid/openapi.json"
+    contract["$id"] = contract_id
+    registry = Registry().with_resource(
+        contract_id,
+        Resource.from_contents(contract, default_specification=DRAFT202012),
+    )
+    schema = {"$ref": f"{contract_id}#/components/schemas/UnifiedParseSuccess"}
+    examples = contract["paths"]["/api/v1/parse"]["post"]["responses"]["200"]["content"][
+        "application/json"
+    ]["examples"]
     for name, example in examples.items():
         errors = list(Draft202012Validator(schema, registry=registry).iter_errors(example["value"]))
         assert errors == [], f"{name}: {errors}"

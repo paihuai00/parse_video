@@ -43,6 +43,11 @@ class Settings:
     rate_limit_per_minute: int = 20
     max_redirects: int = 3
     max_html_bytes: int = 2 * 1024 * 1024
+    douyin_browser_concurrency: int = 1
+    douyin_browser_max_requests: int = 500
+    douyin_browser_max_bytes: int = 32 * 1024 * 1024
+    douyin_state_max_bytes: int = 2 * 1024 * 1024
+    douyin_browser_channel: str | None = None
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -64,4 +69,11 @@ class Settings:
             rate_limit_per_minute=_positive_int("XHS_RATE_LIMIT_PER_MINUTE", 20),
             max_redirects=_positive_int("XHS_MAX_REDIRECTS", 3),
             max_html_bytes=_positive_int("XHS_MAX_HTML_BYTES", 2 * 1024 * 1024),
+            douyin_browser_concurrency=_positive_int("XHS_DOUYIN_BROWSER_CONCURRENCY", 1),
+            douyin_browser_max_requests=_positive_int("XHS_DOUYIN_BROWSER_MAX_REQUESTS", 500),
+            douyin_browser_max_bytes=_positive_int(
+                "XHS_DOUYIN_BROWSER_MAX_BYTES", 32 * 1024 * 1024
+            ),
+            douyin_state_max_bytes=_positive_int("XHS_DOUYIN_STATE_MAX_BYTES", 2 * 1024 * 1024),
+            douyin_browser_channel=(os.getenv("XHS_DOUYIN_BROWSER_CHANNEL", "").strip() or None),
         )

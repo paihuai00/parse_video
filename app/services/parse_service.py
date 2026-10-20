@@ -7,22 +7,15 @@ import hashlib
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Protocol
 
 from app.config import Settings
 from app.errors import AppError
 from app.models import InternalNote
-from app.parser.client import Deadline, PageResponse, XiaohongshuClient
-from app.parser.media import normalize_note
-from app.parser.state_reader import decode_initial_state, select_note
-from app.parser.url_rules import cache_key
+from app.parser.adapters import Adapter, DouyinAdapter, PageFetcher, Platform, XiaohongshuAdapter
+from app.parser.client import Deadline
 from app.services.admission import AdmissionController
 from app.services.cache import CacheEntry, ResultCache
 from app.services.rate_limit import RateLimiter
-
-
-class PageFetcher(Protocol):
-    async def fetch(self, raw_url: str, deadline: Deadline) -> PageResponse: ...
 
 
 @dataclass(frozen=True)
@@ -42,7 +35,10 @@ class InFlight:
 class ParseService:
     def __init__(self, settings: Settings, client: PageFetcher | None = None) -> None:
         self.settings = settings
-        self.client = client or XiaohongshuClient(settings)
+        self.adapters: dict[Platform, Adapter] = {
+            "xiaohongshu": XiaohongshuAdapter(settings, client),
+            "douyin": DouyinAdapter(settings),
+        }
         self.cache = ResultCache(settings.cache_ttl_seconds, settings.cache_max_entries)
         self.rate_limiter = RateLimiter(settings.rate_limit_per_minute)
         self.admission = AdmissionController(
@@ -51,10 +47,17 @@ class ParseService:
         self._inflight: dict[str, InFlight] = {}
         self._inflight_lock = asyncio.Lock()
 
-    async def parse(self, raw_url: str, refresh: bool, api_key: str) -> ServiceResult:
+    async def parse(
+        self,
+        raw_url: str,
+        refresh: bool,
+        api_key: str,
+        platform: Platform = "xiaohongshu",
+    ) -> ServiceResult:
         key_id = hashlib.sha256(api_key.encode("utf-8")).hexdigest()
         self.rate_limiter.check(key_id)
-        key = cache_key(raw_url)
+        adapter = self.adapters[platform]
+        key = adapter.cache_identity(raw_url)
         if not refresh:
             cached = self.cache.get(key)
             if cached:
@@ -71,7 +74,7 @@ class ParseService:
                     >= self.settings.upstream_concurrency + self.settings.queue_capacity
                 ):
                     raise AppError("BUSY", 503, True, "in-flight table is full", 2)
-                task = asyncio.create_task(self._run_leader(raw_url, key, deadline))
+                task = asyncio.create_task(self._run_leader(adapter, raw_url, key, deadline))
                 flight = InFlight(task=task)
                 self._inflight[flight_key] = flight
             else:
@@ -103,12 +106,9 @@ class ParseService:
                     await orphaned_task
 
     async def _run_leader(
-        self, raw_url: str, cache_identity: str, deadline: Deadline
+        self, adapter: Adapter, raw_url: str, cache_identity: str, deadline: Deadline
     ) -> CacheEntry:
         async with self.admission.slot(deadline):
-            page = await self.client.fetch(raw_url, deadline)
-            deadline.remaining()
-            state = decode_initial_state(page.html)
-            note = normalize_note(page.note_id, select_note(state, page.note_id))
+            note = await adapter.parse(raw_url, deadline)
             deadline.remaining()
             return self.cache.put(cache_identity, note)

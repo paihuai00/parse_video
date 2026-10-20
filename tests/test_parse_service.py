@@ -6,6 +6,7 @@ import pytest
 
 from app.config import Settings
 from app.errors import AppError
+from app.models import InternalImage, InternalNote
 from app.parser.client import PageResponse
 from app.services.parse_service import ParseService
 
@@ -22,6 +23,44 @@ class FakeClient:
         self.calls += 1
         await self.gate.wait()
         return PageResponse(self.html, raw_url, "6ad2355f000000001a027848")
+
+
+class FailingDouyinAdapter:
+    def cache_identity(self, raw_url: str) -> str:
+        _ = raw_url
+        return "douyin:failing"
+
+    async def parse(self, raw_url, deadline):
+        _ = raw_url, deadline
+        raise AppError("UPSTREAM_BAD_RESPONSE", 502, True, "browser unavailable")
+
+
+class StaticDouyinAdapter:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def cache_identity(self, raw_url: str) -> str:
+        _ = raw_url
+        return "douyin:synthetic"
+
+    async def parse(self, raw_url, deadline):
+        _ = raw_url, deadline
+        self.calls += 1
+        return InternalNote(
+            "7000000000000000001",
+            "示例",
+            "image",
+            (
+                InternalImage(
+                    "https://p3-pc-sign.douyinpic.com/example.webp",
+                    10,
+                    20,
+                    1,
+                ),
+            ),
+            (),
+            None,
+        )
 
 
 def settings(**overrides) -> Settings:
@@ -145,3 +184,68 @@ async def test_unique_requests_obey_queue_timeout(fixture_html) -> None:
     await first
     assert service.admission.active == 0
     assert service.admission.waiting == 0
+
+
+async def test_same_xiaohongshu_url_shares_cache_across_old_and_unified_routes(
+    fixture_html,
+) -> None:
+    client = FakeClient(fixture_html("image_note.html"))
+    service = ParseService(settings(), client)
+    url = "https://www.xiaohongshu.com/explore/6ad2355f000000001a027848"
+    first = await service.parse(url, False, "test-key")
+    second = await service.parse(url, False, "test-key", platform="xiaohongshu")
+    assert not first.cache_hit and second.cache_hit
+    assert client.calls == 1
+
+
+async def test_douyin_browser_failure_does_not_poison_xiaohongshu(fixture_html) -> None:
+    client = FakeClient(fixture_html("image_note.html"))
+    service = ParseService(settings(), client)
+    service.adapters["douyin"] = FailingDouyinAdapter()
+    with pytest.raises(AppError) as caught:
+        await service.parse("https://v.douyin.com/exampleToken/", False, "test-key", "douyin")
+    assert caught.value.code == "UPSTREAM_BAD_RESPONSE"
+    result = await service.parse(
+        "https://www.xiaohongshu.com/explore/6ad2355f000000001a027848",
+        False,
+        "test-key",
+    )
+    assert result.note.note_id == "6ad2355f000000001a027848"
+
+
+async def test_platforms_share_rate_limit_but_keep_cache_entries_isolated(fixture_html) -> None:
+    client = FakeClient(fixture_html("image_note.html"))
+    service = ParseService(settings(rate_limit_per_minute=1), client)
+    douyin = StaticDouyinAdapter()
+    service.adapters["douyin"] = douyin
+
+    await service.parse(
+        "https://www.xiaohongshu.com/explore/6ad2355f000000001a027848",
+        False,
+        "shared-key",
+    )
+    with pytest.raises(AppError) as caught:
+        await service.parse(
+            "https://v.douyin.com/exampleToken/",
+            False,
+            "shared-key",
+            "douyin",
+        )
+    assert caught.value.code == "RATE_LIMITED"
+
+    first = await service.parse(
+        "https://v.douyin.com/exampleToken/",
+        False,
+        "other-key",
+        "douyin",
+    )
+    second = await service.parse(
+        "https://v.douyin.com/exampleToken/",
+        False,
+        "third-key",
+        "douyin",
+    )
+    assert not first.cache_hit and second.cache_hit
+    assert first.note.note_id == "7000000000000000001"
+    assert douyin.calls == 1
+    assert len(service.cache) == 2

@@ -1,14 +1,15 @@
 # Docker 部署与验收清单
 
-仓库已提供 API、`Dockerfile`、`compose.yaml`、`.env.example` 和 Nginx 示例。Compose 配置、本机 `linux/arm64` 镜像构建和容器运行已通过验收，一篇授权 Live Photo 链接和一个手机复制的 `xhslink.cn/o/<token>` 短链已在本地完成脱敏探测；目标 VPS 架构、出口网络及其他代表性链接仍需部署者按本文执行验收。用户自行在已有 Docker 的 VPS 上部署，无需提供 SSH 密码或服务器密钥。
+仓库已提供统一 API、`Dockerfile`、`compose.yaml`、`.env.example` 和 Nginx 示例。Compose 配置、本机 `linux/arm64` 镜像构建和容器运行已通过验收；小红书授权样本及抖音普通视频/静态图文均完成本地脱敏探测。目标 VPS 架构、出口网络及调用方媒体读取仍需部署者按本文执行验收。用户自行在已有 Docker 的 VPS 上部署，无需提供 SSH 密码或服务器密钥。
 
 ## 1. 目标运行方式
 
 - Python 3.12，基础镜像采用 `python:3.12.8-slim-bookworm`；仍需在目标 Linux 架构验证镜像构建。
 - FastAPI + Uvicorn，固定 **1 个 worker**，容器内监听 `0.0.0.0:8000`。
 - 固定 `curl_cffi==0.13.0` 和 `XHS_IMPERSONATE=chrome136`，保留 TLS 证书验证。已验证的本地匿名请求组合是第一版基线，升级库或浏览器配置必须重新验证样本。
+- 固定 `playwright==1.64.0` 及配套 Chromium。抖音解析使用新的匿名浏览器进程和上下文，完整 Chromium 沙箱开启；应用进程仍以 UID/GID 10001 运行。
 - 单进程使用内存缓存、并发限制和有界等待队列，不依赖数据库、Redis 或任务服务。重启清空这些内存状态；增加 worker 会让限流与缓存分裂，不能直接作为扩容办法。
-- API 只返回图片、每张图片可选的 Live Photo 动态 MP4、普通视频笔记的主视频地址及元数据，不代理、保存或转码媒体。调用方直接访问小红书 CDN。
+- API 只返回图片、每张小红书图片可选的 Live Photo 动态 MP4、普通视频主地址及元数据，不代理、保存或转码媒体。调用方直接访问对应平台 CDN。
 - 本机端口只映射至 VPS 的 `127.0.0.1:8000`，公网入口通过现有 Nginx 提供 HTTPS。
 
 ## 2. 配置约定
@@ -31,6 +32,11 @@ XHS_CACHE_MAX_ENTRIES=256
 XHS_RATE_LIMIT_PER_MINUTE=20
 XHS_MAX_REDIRECTS=3
 XHS_MAX_HTML_BYTES=2097152
+XHS_DOUYIN_BROWSER_CONCURRENCY=1
+XHS_DOUYIN_BROWSER_MAX_REQUESTS=500
+XHS_DOUYIN_BROWSER_MAX_BYTES=33554432
+XHS_DOUYIN_STATE_MAX_BYTES=2097152
+XHS_DOUYIN_BROWSER_CHANNEL=
 ```
 
 20 秒是从请求准入开始的完整处理时限，包含排队、跳转、重试和解析，不能在每次跳转或重试时重新计时；排队同时受 2 秒上限约束。Nginx 的等待时间应略大于应用的完整处理时限，让应用优先返回契约中的错误。HTML 上限按解压后的正文计算。缓存 TTL 不代表媒体直链的有效期。
@@ -53,7 +59,11 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     restart: unless-stopped
+    init: true
     mem_limit: 512m
+    pids_limit: 256
+    security_opt:
+      - seccomp=./deploy/chromium-seccomp.json
     logging:
       driver: json-file
       options:
@@ -71,13 +81,13 @@ services:
       start_period: 10s
     read_only: true
     tmpfs:
-      - /tmp:size=64m,mode=1777
+      - /tmp:size=64m,mode=1777,noexec,nosuid
 ```
 
 `required: false` 只用于让交付仓库在尚未创建本机 `.env` 时也能执行静态配置校验；
 生产进程仍会在 `XHS_API_KEY` 缺失或为空时拒绝启动。部署前仍必须按上文创建 `.env`。
 
-512 MiB 是初始内存预算，可根据实际峰值调整，不是已经测出的最低配置。日志写标准输出，不向镜像目录写文件；`PYTHONDONTWRITEBYTECODE=1` 避免生成字节码。只读文件系统与临时目录行为仍需在目标 Docker 主机验证。
+`deploy/chromium-seccomp.json` 固定取自 Playwright `v1.64.0` 官方 Docker 配置，以 Docker 默认 seccomp 为基础额外允许 Chromium 沙箱需要的 `clone`、`setns` 和 `unshare`；不要删除该配置或改用 `--no-sandbox`。本地抖音容器实测在 512 MiB 限制内完成真实解析，没有 OOM；该值不是所有架构和负载的最低保证。日志写标准输出，不向镜像目录写文件；`PYTHONDONTWRITEBYTECODE=1` 避免生成字节码。只读文件系统与临时目录行为仍需在目标 Docker 主机验证。
 
 Docker 健康检查只证明应用本身能响应；不向小红书发请求，避免健康探针消耗请求配额。`restart: unless-stopped` 会处理进程退出，但容器仅变为 `unhealthy` 时不会自动重启，需保留告警或人工排查入口。
 
@@ -123,16 +133,16 @@ curl --fail --silent --show-error http://127.0.0.1:8000/healthz
 解析请求的契约固定为：
 
 ```http
-POST /api/v1/xiaohongshu/parse HTTP/1.1
+POST /api/v1/parse HTTP/1.1
 Content-Type: application/json
 X-API-Key: <部署时设置的密钥>
 
-{"url":"<完整小红书分享链接>","refresh":false}
+{"url":"<完整小红书或抖音分享链接>","refresh":false}
 ```
 
 初次验证保留分享链接的完整查询参数。`refresh:true` 只能跳过结果缓存，不能绕过鉴权、限流、并发或队列限制。具体成功及错误 JSON 以 API 契约文档为准，部署层不另定义一套返回结构。
 
-输入可以是标准详情链接、`xhslink.com` 短链，或手机复制的精确 `xhslink.cn/o/<token>` 形式。`.cn` 子域、相似域和其他路径会返回 `INVALID_URL`；服务不会为了兼容短链而放宽逐跳 DNS、公网地址、端口或最终详情页校验。
+统一入口还支持精确 `v.douyin.com` 短链、`www.douyin.com/video/<id>`、`www.douyin.com/note/<id>` 及已验证的 iesdouyin 分享路径。旧 `POST /api/v1/xiaohongshu/parse` 保留原行为。相似域和其他路径会返回 `INVALID_URL`；服务不会为了兼容短链而放宽 DNS、公网地址、端口或最终详情页校验。
 
 ### 第二步：先通过本机端口或 SSH 隧道验收
 
@@ -149,7 +159,7 @@ ssh -N -L 18000:127.0.0.1:8000 <已有SSH用户>@<VPS地址>
 在已有配置之外新增专用站点或经确认的 API 路由，先备份涉及的配置，再检查并平滑加载，不覆盖现有业务。完整起点见 `deploy/nginx.conf.example`；以下只展示核心转发关系：
 
 ```nginx
-location /api/v1/xiaohongshu/ {
+location = /api/v1/parse {
     proxy_pass http://127.0.0.1:8000;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
@@ -208,4 +218,4 @@ location /api/v1/xiaohongshu/ {
 | D5 | VPS 与调用方验收 | 两端验证媒体访问条件，保存失败原因，形成明确支持范围 |
 | D6 | 发布与回滚 | 固定镜像版本，保留上一版，实际演练一次回滚 |
 
-当前已完成 D1 的离线实现、D2/D4 的文件交付，以及 D2 的本机 `linux/arm64` 构建和运行验收。D3 的真实解析/容量验收、目标 VPS 与调用方验收、HTTPS 接入和实际回滚演练尚未执行。
+当前已完成 D1 的离线实现、D2/D4 的文件交付、D2 的本机 `linux/arm64` 构建和运行验收，以及 D3 的本地抖音真实解析。目标 VPS 与调用方验收、HTTPS 接入和实际回滚演练尚未执行。

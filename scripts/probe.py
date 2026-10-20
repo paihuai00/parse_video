@@ -6,17 +6,23 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import socket
 import sys
 import urllib.error
 import urllib.request
 from urllib.parse import urlsplit
 
+from curl_cffi import CurlOpt, requests
+
+from app.parser.douyin.media import normalize_douyin_media_url
 from app.parser.media import normalize_media_url
+from app.parser.url_rules import is_public_address
 
 
-def api_parse(api_url: str, api_key: str, share_url: str) -> dict:
+def api_parse(api_url: str, api_key: str, share_url: str, legacy_xiaohongshu: bool = False) -> dict:
+    path = "/api/v1/xiaohongshu/parse" if legacy_xiaohongshu else "/api/v1/parse"
     request = urllib.request.Request(
-        api_url.rstrip("/") + "/api/v1/xiaohongshu/parse",
+        api_url.rstrip("/") + path,
         data=json.dumps({"url": share_url, "refresh": True}).encode(),
         headers={"Content-Type": "application/json", "X-API-Key": api_key},
         method="POST",
@@ -32,25 +38,45 @@ def api_parse(api_url: str, api_key: str, share_url: str) -> dict:
 
 
 def check_media(url: str, full_download: bool) -> dict:
-    normalized_url = normalize_media_url(url)
+    normalized_url = normalize_media_url(url) or normalize_douyin_media_url(url)
     if normalized_url is None:
         raise ValueError("API returned an unsupported media URL")
-    headers = {"Referer": "https://www.xiaohongshu.com/"}
+    host = urlsplit(normalized_url).hostname or ""
+    infos = socket.getaddrinfo(
+        host,
+        443,
+        family=socket.AF_UNSPEC,
+        type=socket.SOCK_STREAM,
+        proto=socket.IPPROTO_TCP,
+    )
+    addresses = tuple(dict.fromkeys(info[4][0] for info in infos))
+    if not addresses or any(not is_public_address(address) for address in addresses):
+        raise ValueError("media host did not resolve exclusively to public addresses")
+    headers = {"Referer": "https://www.xiaohongshu.com/"} if host.endswith("xhscdn.com") else {}
     if not full_download:
         headers["Range"] = "bytes=0-1023"
-    request = urllib.request.Request(normalized_url, headers=headers)
-    with urllib.request.urlopen(request, timeout=30) as response:
+    with requests.Session(
+        impersonate="chrome136",
+        trust_env=False,
+        curl_options={CurlOpt.RESOLVE: [f"{host}:443:{','.join(addresses)}"]},
+    ) as session:
+        response = session.get(
+            normalized_url,
+            headers=headers,
+            timeout=30,
+            allow_redirects=False,
+            stream=True,
+        )
         downloaded = 0
-        while True:
-            chunk = response.read(64 * 1024 if full_download else 1024)
-            if not chunk:
-                break
+        for chunk in response.iter_content(chunk_size=64 * 1024 if full_download else 1024):
             downloaded += len(chunk)
             if not full_download:
                 break
+        content_type = response.headers.get("content-type", "").split(";", 1)[0]
+        response.close()
         return {
-            "status": response.status,
-            "content_type": response.headers.get_content_type(),
+            "status": response.status_code,
+            "content_type": content_type,
             "bytes_read": downloaded,
             "host": urlsplit(normalized_url).hostname,
         }
@@ -116,11 +142,16 @@ def redacted_summary(payload: dict, check_headers: bool, full_download: bool) ->
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Probe one or two authorized Xiaohongshu URLs through the deployed API"
+        description="Probe one or two authorized Xiaohongshu or Douyin URLs through the API"
     )
     parser.add_argument("url", nargs="+", help="one or two full share URLs")
     parser.add_argument("--api-url", default="http://127.0.0.1:8000")
     parser.add_argument("--check-media-headers", action="store_true")
+    parser.add_argument(
+        "--legacy-xiaohongshu",
+        action="store_true",
+        help="send requests to the retained Xiaohongshu-only route",
+    )
     parser.add_argument(
         "--full-download",
         action="store_true",
@@ -135,7 +166,9 @@ def main() -> int:
     summaries = []
     for share_url in args.url:
         try:
-            payload = api_parse(args.api_url, api_key, share_url)
+            payload = api_parse(
+                args.api_url, api_key, share_url, legacy_xiaohongshu=args.legacy_xiaohongshu
+            )
             summaries.append(
                 redacted_summary(payload, args.check_media_headers, args.full_download)
             )

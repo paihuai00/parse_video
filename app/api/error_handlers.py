@@ -11,7 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.errors import MESSAGES, AppError
+from app.errors import MESSAGES, UNIFIED_MESSAGES, AppError
 from app.models import ErrorDetails, ParseError, ResponseMeta
 
 logger = logging.getLogger("parser_video")
@@ -23,10 +23,11 @@ def request_id(request: Request) -> str:
 
 def error_response(request: Request, error: AppError) -> JSONResponse:
     request.state.outcome_code = error.code
+    messages = UNIFIED_MESSAGES if request.url.path == "/api/v1/parse" else MESSAGES
     payload = ParseError(
         error=ErrorDetails(
             code=error.code,
-            message=error.public_message,
+            message=messages[error.code],
             retryable=error.retryable,
         ),
         meta=ResponseMeta(request_id=request_id(request), parsed_at=None, cache=None),

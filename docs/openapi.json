@@ -2,9 +2,9 @@
   "openapi": "3.1.0",
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
-    "title": "小红书媒体解析 API",
+    "title": "小红书与抖音媒体解析 API",
     "version": "0.1.0",
-    "description": "面向小流量单机 VPS：调用方提供单个小红书链接，服务匿名获取页面并返回有序图片（每张可带对应实况 MP4）或普通视频笔记的一个主视频 MP4 直链，不使用小红书账号登录。X-API-Key 是本站调用密钥，与小红书账号、密码及 Cookie 无关。仅缓存成功结果，默认 TTL 120 秒。v1 不代理下载、不上传媒体、不验证媒体文件内容；媒体源尺寸等字段来自网页元数据。所有示例 media.example.com URL 都是占位地址。框架与反向代理可控制的错误响应均应为 application/json；网络断连等无 HTTP 响应的情形不在 JSON 保证范围。"
+    "description": "面向小流量单机 VPS：统一入口接受单个受支持的小红书或抖音链接，返回有序正文图片或普通视频的一个主 MP4 直链；旧小红书入口继续兼容。X-API-Key 是本站调用密钥，与平台账号、密码及 Cookie 无关。仅缓存成功结果，默认 TTL 120 秒。v1 不代理下载、不上传媒体、不验证媒体文件内容；媒体源尺寸等字段来自网页元数据。所有示例 media.example.com URL 都是占位地址。框架与反向代理可控制的错误响应均应为 application/json；网络断连等无 HTTP 响应的情形不在 JSON 保证范围。"
   },
   "security": [
     {
@@ -12,6 +12,119 @@
     }
   ],
   "paths": {
+    "/api/v1/parse": {
+      "post": {
+        "operationId": "parseMediaWork",
+        "summary": "解析单个小红书或抖音作品的图片或 MP4 直链",
+        "description": "根据 URL 精确主机和路径自动选择平台。请求、鉴权、资源配额和响应媒体字段与旧小红书入口一致；抖音支持普通视频和静态图文，动态图文、登录内容及直播返回明确错误。",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功提取目标作品的受支持正文媒体。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnifiedParseSuccess"
+                },
+                "examples": {
+                  "douyin_image": {
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "note_id": "7000000000000000002",
+                        "title": "静态图文示例",
+                        "type": "image",
+                        "images": [
+                          {
+                            "url": "https://media.example.com/douyin-image-1.webp",
+                            "source_width": 1260,
+                            "source_height": 2388,
+                            "url_expires_at": null,
+                            "verification": "not_checked",
+                            "index": 1
+                          }
+                        ],
+                        "videos": [],
+                        "cover": null
+                      },
+                      "error": null,
+                      "meta": {
+                        "request_id": "bdf2bfb0-c44b-4d49-99dd-cdf1f439d69a",
+                        "parsed_at": "2026-10-20T08:00:00Z",
+                        "cache": {
+                          "hit": false,
+                          "expires_at": "2026-10-20T08:02:00Z"
+                        }
+                      }
+                    }
+                  },
+                  "douyin_video": {
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "note_id": "7000000000000000001",
+                        "title": "普通视频示例",
+                        "type": "video",
+                        "images": [],
+                        "videos": [
+                          {
+                            "url": "https://media.example.com/douyin-video.mp4",
+                            "source_width": 1080,
+                            "source_height": 1920,
+                            "url_expires_at": null,
+                            "verification": "not_checked",
+                            "format": "mp4",
+                            "codec": "H264",
+                            "quality": "normal_1080",
+                            "duration_seconds": 24.6,
+                            "size_bytes": 5455873
+                          }
+                        ],
+                        "cover": null
+                      },
+                      "error": null,
+                      "meta": {
+                        "request_id": "da3059b7-b781-41f6-b3b1-5b44b9713724",
+                        "parsed_at": "2026-10-20T08:00:00Z",
+                        "cache": {
+                          "hit": false,
+                          "expires_at": "2026-10-20T08:02:00Z"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error400" },
+          "401": { "$ref": "#/components/responses/Error401" },
+          "404": { "$ref": "#/components/responses/Error404" },
+          "405": { "$ref": "#/components/responses/Error405" },
+          "413": { "$ref": "#/components/responses/Error413" },
+          "422": { "$ref": "#/components/responses/Error422" },
+          "429": { "$ref": "#/components/responses/Error429" },
+          "500": { "$ref": "#/components/responses/Error500" },
+          "502": { "$ref": "#/components/responses/Error502" },
+          "503": { "$ref": "#/components/responses/Error503" },
+          "504": { "$ref": "#/components/responses/Error504" }
+        }
+      }
+    },
     "/api/v1/xiaohongshu/parse": {
       "post": {
         "operationId": "parseXiaohongshuNote",
@@ -590,6 +703,70 @@
         },
         "description": "视频笔记必须取得主视频 MP4；只有封面不构成成功。"
       },
+      "UnifiedImageNote": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["note_id", "title", "type", "images", "videos", "cover"],
+        "properties": {
+          "note_id": {
+            "type": "string",
+            "pattern": "^(?:[0-9a-fA-F]{24}|[0-9]{18,20})$"
+          },
+          "title": {
+            "type": ["string", "null"]
+          },
+          "type": {
+            "type": "string",
+            "const": "image"
+          },
+          "images": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "$ref": "#/components/schemas/ImageMedia" }
+          },
+          "videos": {
+            "type": "array",
+            "maxItems": 0,
+            "items": { "$ref": "#/components/schemas/VideoMedia" }
+          },
+          "cover": { "type": "null" }
+        }
+      },
+      "UnifiedVideoNote": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["note_id", "title", "type", "images", "videos", "cover"],
+        "properties": {
+          "note_id": {
+            "type": "string",
+            "pattern": "^(?:[0-9a-fA-F]{24}|[0-9]{18,20})$"
+          },
+          "title": {
+            "type": ["string", "null"]
+          },
+          "type": {
+            "type": "string",
+            "const": "video"
+          },
+          "images": {
+            "type": "array",
+            "maxItems": 0,
+            "items": { "$ref": "#/components/schemas/ImageMedia" }
+          },
+          "videos": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1,
+            "items": { "$ref": "#/components/schemas/VideoMedia" }
+          },
+          "cover": {
+            "oneOf": [
+              { "$ref": "#/components/schemas/CoverMedia" },
+              { "type": "null" }
+            ]
+          }
+        }
+      },
       "ParsedNote": {
         "oneOf": [
           {
@@ -736,6 +913,42 @@
                   "cache": {
                     "$ref": "#/components/schemas/CacheMetadata"
                   }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "UnifiedParseSuccess": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["success", "data", "error", "meta"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "data": {
+            "oneOf": [
+              { "$ref": "#/components/schemas/UnifiedImageNote" },
+              { "$ref": "#/components/schemas/UnifiedVideoNote" }
+            ],
+            "discriminator": {
+              "propertyName": "type",
+              "mapping": {
+                "image": "#/components/schemas/UnifiedImageNote",
+                "video": "#/components/schemas/UnifiedVideoNote"
+              }
+            }
+          },
+          "error": { "type": "null" },
+          "meta": {
+            "allOf": [
+              { "$ref": "#/components/schemas/ResponseMeta" },
+              {
+                "properties": {
+                  "parsed_at": { "type": "string", "format": "date-time" },
+                  "cache": { "$ref": "#/components/schemas/CacheMetadata" }
                 }
               }
             ]
