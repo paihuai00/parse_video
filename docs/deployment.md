@@ -45,7 +45,7 @@ XHS_DOUYIN_BROWSER_CHANNEL=
 
 ## 3. Compose 配置
 
-`compose.yaml` 使用本地构建的 `parser-video:0.1.0` 标签；该标签不是远程仓库中的可拉取镜像。Dockerfile 创建 UID/GID `10001`，安装锁定依赖，并以单 worker 启动 Uvicorn。实际文件还启用了只读文件系统和 `/tmp` tmpfs。
+`compose.yaml` 使用本地构建的 `parser-video:0.1.0` 标签；该标签不是远程仓库中的可拉取镜像。Dockerfile 创建 UID/GID `10001` 及 `/home/app` 用户目录，安装锁定依赖，并以单 worker 启动 Uvicorn。实际文件还启用了只读文件系统、`/tmp` tmpfs，以及专供 Chromium 配置与 crashpad 元数据使用的有界 `/home/app` tmpfs。
 
 ```yaml
 services:
@@ -82,12 +82,13 @@ services:
     read_only: true
     tmpfs:
       - /tmp:size=64m,mode=1777,noexec,nosuid
+      - /home/app:size=16m,mode=0700,uid=10001,gid=10001,noexec,nosuid,nodev
 ```
 
 `required: false` 只用于让交付仓库在尚未创建本机 `.env` 时也能执行静态配置校验；
 生产进程仍会在 `XHS_API_KEY` 缺失或为空时拒绝启动。部署前仍必须按上文创建 `.env`。
 
-`deploy/chromium-seccomp.json` 固定取自 Playwright `v1.64.0` 官方 Docker 配置，以 Docker 默认 seccomp 为基础额外允许 Chromium 沙箱需要的 `clone`、`setns` 和 `unshare`；不要删除该配置或改用 `--no-sandbox`。本地抖音容器实测在 512 MiB 限制内完成真实解析，没有 OOM；该值不是所有架构和负载的最低保证。日志写标准输出，不向镜像目录写文件；`PYTHONDONTWRITEBYTECODE=1` 避免生成字节码。只读文件系统与临时目录行为仍需在目标 Docker 主机验证。
+`deploy/chromium-seccomp.json` 固定取自 Playwright `v1.64.0` 官方 Docker 配置，以 Docker 默认 seccomp 为基础额外允许 Chromium 沙箱需要的 `clone`、`setns` 和 `unshare`；不要删除该配置或改用 `--no-sandbox`。镜像将 `HOME`、`XDG_CONFIG_HOME`、`XDG_CACHE_HOME`、`XDG_DATA_HOME` 指向 `/home/app` 下的对应目录，Compose 再以 UID/GID 10001、0700 模式挂载 16 MiB 临时文件系统。该挂载不能省略：非 root Chromium 在只读根文件系统上需要可写用户目录初始化 crashpad 及其可能创建的其他用户级数据；目录只保存单次容器生命周期内的浏览器元数据，重建容器即清空。`/tmp` 继续单独承载 Playwright 的临时浏览器 profile。本地抖音容器实测在 512 MiB 限制内完成真实解析，没有 OOM；该值不是所有架构和负载的最低保证。日志写标准输出，不向镜像目录写文件；`PYTHONDONTWRITEBYTECODE=1` 避免生成字节码。
 
 Docker 健康检查只证明应用本身能响应；不向小红书发请求，避免健康探针消耗请求配额。`restart: unless-stopped` 会处理进程退出，但容器仅变为 `unhealthy` 时不会自动重启，需保留告警或人工排查入口。
 
@@ -114,13 +115,13 @@ docker compose up -d
 docker compose ps
 ```
 
-2026-10-18 在 Docker Desktop `linux/arm64` 上完成的本机证据如下：
+2026-10-18 在 Docker Desktop `linux/arm64` 上完成基础容器验收；2026-10-20 增加 Chromium 可写 HOME 后复验相关运行约束：
 
 - `docker compose config --quiet` 和镜像构建通过；锁定的 `curl_cffi==0.13.0` 安装了原生 aarch64 wheel。
 - 当时本机访问 Docker Hub 鉴权端点发生 TLS 超时，因此先从 AWS Public ECR 的 Docker Official Images 镜像取得同一 `python:3.12.8-slim-bookworm` 标签（digest `sha256:2199a62885a12290dc9c5be3ca0681d367576ab7bf037da120e564723292a2f0`），在本机重打标签后使用 `--pull=false` 完成构建。该结果不证明目标部署网络能从 Docker Hub 冷启动拉取基础镜像。
 - 缺失和显式为空的生产 `XHS_API_KEY` 均以退出码 1 拒绝启动；配置临时本地测试密钥后，`docker compose up -d` 和 `/healthz` 通过，容器状态为 `healthy`。
 - 运行进程为 UID/GID `10001:10001`，进程表只有一个带 `--workers 1` 的 Uvicorn；实际端口映射为 `127.0.0.1:8000`。
-- 运行态检查确认 cgroup 内存上限为 512 MiB、根文件系统只读、`/tmp` 使用 tmpfs，并应用 `json-file` 的 `max-size=10m`、`max-file=3` 配置。
+- 2026-10-20 运行态检查确认 cgroup 内存上限为 512 MiB、根文件系统只读、`/tmp` 与 `/home/app` 使用有界 tmpfs，`/home/app` 为 UID/GID 10001 所有且模式为 0700，并应用 `json-file` 的 `max-size=10m`、`max-file=3` 配置；同一约束下 Chromium 启动和页面操作通过。
 
 这些证据覆盖本地容器交付，不覆盖真实页面匿名访问、目标 VPS 原生架构、HTTPS、调用方媒体下载或回滚演练。
 

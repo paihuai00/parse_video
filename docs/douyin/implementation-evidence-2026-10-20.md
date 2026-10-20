@@ -38,7 +38,9 @@ I1 的完整作品对象实际只有一个图片槽位，因此返回一张是�
 
 ## 容器与回归
 
-镜像固定 `playwright==1.64.0` 及配套 Chromium，应用保持 UID/GID 10001、单 Uvicorn worker、只读根文件系统、64 MiB `/tmp` tmpfs、512 MiB 内存和 256 PID 上限。完整 Chromium 使用 root 所有的 sandbox helper，并应用 Playwright 官方 Docker seccomp profile 所需的用户命名空间例外；运行应用本身仍为非 root。
+镜像固定 `playwright==1.64.0` 及配套 Chromium，应用保持 UID/GID 10001、单 Uvicorn worker、只读根文件系统、64 MiB `/tmp` tmpfs、16 MiB `/home/app` tmpfs、512 MiB 内存和 256 PID 上限。`HOME` 与 XDG 配置、缓存、数据目录明确指向仅该 UID 可写的 `/home/app`，为 crashpad 及 Chromium 可能创建的其他用户级数据提供临时可写位置，避免只读根和无用户目录使 Chromium 在部分原生 Linux 主机启动失败。完整 Chromium 使用 root 所有的 sandbox helper，并应用 Playwright 官方 Docker seccomp profile 所需的用户命名空间例外；运行应用本身仍为非 root，也没有加入 `--no-sandbox`。
+
+原生 Linux 的只读根容器曾稳定复现 Chrome 156 Crashpad `SIGTRAP`；把 HOME 与 XDG 目录指向可写临时目录后，同一环境取得 `LAUNCH_OK` 和 `PAGE_OK`。最终镜像又在上述完整容器约束下确认 `/home/app` 的所有者为 10001:10001、模式为 0700，沙箱浏览器可启动；接口复验中普通视频返回 200，带动态 MP4 的图片作品保持 422，没有因启动修复改变媒体判定。
 
 本地 `linux/arm64` 容器对最终实现的四样本真实请求保持上述结果。多轮解析后的 cgroup 记录为 PID 峰值 166/256，`oom=0`、`oom_kill=0`；内存触及 512 MiB 上限并发生回收，请求仍完成。浏览器进程清理后只剩 init 与 Uvicorn，内存回落至约 64 MiB、`pids.current=5`。该结果证明单并发在本机限制下可运行，也表明没有充足内存余量；目标 VPS 应保留并发 1 并复测，不能据此提高并发。目标 VPS 原生架构、HTTPS 接入和回滚演练仍需部署者执行。
 

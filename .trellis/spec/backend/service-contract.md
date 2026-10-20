@@ -140,7 +140,7 @@ Every application and framework error uses `ParseError`. Nginx-generated 413/502
 - Service: success-only TTL/LRU, refresh bypass, two active leaders, four total waiters including followers, per-caller metadata, orphan cancellation/await, and cleanup on timeout/cancellation.
 - Douyin browser: exact work-ID response binding, incrementally bounded Flight scripts, exact egress hosts, private/mixed DNS rejection, pinned CONNECT targets, request/tunnel/state limits, fresh contexts, browser startup failure isolation, total-deadline cancellation, handler/process cleanup, and motion-image rejection.
 - API/logging: authentication variants, 404/405/validation/unexpected errors, no secret-bearing logs, and safe outcome/cache/note/capacity fields.
-- Deployment: `docker compose config --quiet`; build/non-root start/health on an available daemon; real probe only with a user-authorized URL and redacted output. Header checks select at most two representative files and, when Live Photos exist, cover one still plus one nested motion MP4.
+- Deployment: `docker compose config --quiet`; build/non-root start/health on an available daemon; a read-only root must pair bounded writable `/tmp` and `/home/app` tmpfs mounts with the image's HOME/XDG paths, and `/home/app` remains owned by runtime UID/GID 10001 with mode 0700. Real probes use only user-authorized URLs and redacted output. Header checks select at most two representative files and, when Live Photos exist, cover one still plus one nested motion MP4.
 
 ### 7. Wrong vs Correct
 

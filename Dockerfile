@@ -12,11 +12,16 @@ COPY requirements.lock ./
 RUN pip install --no-cache-dir --requirement requirements.lock
 RUN python -m playwright install --with-deps --no-shell chromium
 RUN groupadd --gid 10001 app \
-    && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin app \
+    && useradd --uid 10001 --gid 10001 --create-home --home-dir /home/app --shell /usr/sbin/nologin app \
     && chmod -R a+rX /ms-playwright \
     && sandbox_path="$(find /ms-playwright -type f -name chrome_sandbox -print -quit)" \
     && test -n "$sandbox_path" \
     && install --owner=root --group=root --mode=4755 "$sandbox_path" "$CHROME_DEVEL_SANDBOX"
+
+ENV HOME=/home/app \
+    XDG_CONFIG_HOME=/home/app/.config \
+    XDG_CACHE_HOME=/home/app/.cache \
+    XDG_DATA_HOME=/home/app/.local/share
 
 COPY app ./app
 

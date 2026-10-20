@@ -46,9 +46,9 @@ docker compose build
 docker compose up -d
 ```
 
-Compose 默认只绑定 `127.0.0.1:8000`，以 UID/GID `10001`、单 Uvicorn worker、只读文件系统运行。镜像包含固定版本 Chromium，并应用配套的 seccomp sandbox profile；每次抖音解析使用独立浏览器进程和匿名上下文，PID、并发、请求数、隧道字节及总时限均受限。公网接入示例见 `deploy/nginx.conf.example`。
+Compose 默认只绑定 `127.0.0.1:8000`，以 UID/GID `10001`、单 Uvicorn worker、只读文件系统运行。`/tmp` 与非 root 浏览器的 `/home/app` 分别使用有界 tmpfs，后者为 Chromium 配置和 crashpad 元数据提供临时可写目录。镜像包含固定版本 Chromium，并应用配套的 seccomp sandbox profile；每次抖音解析使用独立浏览器进程和匿名上下文，PID、并发、请求数、隧道字节及总时限均受限。公网接入示例见 `deploy/nginx.conf.example`。
 
-2026-10-20 的本机 Docker Desktop `linux/arm64` 验收确认了缺失/空生产密钥会启动失败、容器健康检查通过，并且 512 MiB 内存、256 PID、只读根、64 MiB 临时目录与 `json-file` 日志轮转配置已应用。受限容器内的抖音真实请求成功，但内存发生上限回收，因此生产保持浏览器并发 1 并在目标 VPS 复测。该结果不替代目标 VPS 验收。
+2026-10-20 的本机 Docker Desktop `linux/arm64` 验收确认了缺失/空生产密钥会启动失败、容器健康检查通过，并且 512 MiB 内存、256 PID、只读根、64 MiB `/tmp`、16 MiB 非 root HOME 与 `json-file` 日志轮转配置已应用。受限容器内的抖音真实请求成功，但内存发生上限回收，因此生产保持浏览器并发 1 并在目标 VPS 复测。该结果不替代目标 VPS 验收。
 
 ## 离线验证
 
