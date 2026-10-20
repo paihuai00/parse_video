@@ -3,7 +3,7 @@
   "name": "douyin-media-parser",
   "title": "复用小红书接口新增抖音视频与图文解析",
   "description": "复用小红书契约，新增统一解析入口并通过受控匿名浏览器支持抖音普通视频与静态图文。",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": "backend",
   "scope": null,
   "package": null,
@@ -11,7 +11,7 @@
   "creator": "cuishuxiang",
   "assignee": "cuishuxiang",
   "createdAt": "2026-10-19",
-  "completedAt": null,
+  "completedAt": "2026-10-20",
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
@@ -32,6 +32,12 @@
     "docs/douyin/implementation-evidence-2026-10-20.md",
     ".trellis/tasks/10-19-douyin-media-parser/research/planning-convergence-2026-10-20.md"
   ],
-  "notes": "2026-10-20: 本地实现、四样本分类、代表媒体读取、离线回归与本地容器验收完成；目标 VPS 原生架构、HTTPS 和调用方验收待执行。",
-  "meta": {}
+  "notes": "2026-10-20 用户要求暂停并归档。P0-P3 已完成并通过本地真实样本、媒体可读性、离线回归与受限容器验证；P4 目标 VPS 未通过：Crashpad SIGTRAP 已由 be32fc7 修复，但受控浏览器获取作品在 60 秒独立诊断期限内仍超时。归档不表示 VPS 验收完成；恢复与回滚见 pause-handoff-2026-10-20.md。",
+  "meta": {
+    "closure": "paused_by_user",
+    "acceptance": "p4_vps_not_accepted",
+    "feature_commit": "04037bd2340b802bc1938e74a9b35ffd8b60750a",
+    "container_fix_commit": "be32fc77671d7334b759bf9617abd3117271c19d",
+    "pre_feature_commit": "8ffe3aeeef0d8a273bb98c105e5a0c6e03348cab"
+  }
 }
