@@ -71,7 +71,8 @@ XHS_API_KEY="$XHS_API_KEY" python -m scripts.probe '<小红书或抖音链接>'
 ## 设计边界
 
 - 精确支持 `www.xiaohongshu.com`、`xiaohongshu.com` 的 `/discovery/item/{id}`、`/explore/{id}`，以及逐跳校验的 `xhslink.com` 短链和手机复制的 `xhslink.cn/o/<token>`。`.cn` 相似域名、子域名及其他路径不受支持。
-- 固定 `curl_cffi==0.13.0` 和 `chrome136`，每次解析使用新的匿名 Cookie 会话。
+- 固定 `curl_cffi==0.13.0`，桌面策略默认 `chrome136`；已校验详情页跳转到同主机精确 `/404` 时，允许一次 `safari184_ios` 匿名移动页兜底。两种策略共享原始总期限、重试和跳转预算，不需要安装 Safari 或提供登录 Cookie。
+- 移动页首版支持完整普通静态图文，校验移动状态的目标 ID、错误标记及每个图片槽位，优先使用 `H5_DTL` 详情图；预览图、缺图或移动动态内容不会被当作完整静态结果返回。桌面原有视频和 Live Photo 逻辑保持不变。
 - 固定 `playwright==1.64.0` 和配套 Chromium。抖音浏览器全部 HTTPS 连接经回环 CONNECT 代理：精确主机白名单、逐连接公网 DNS 校验，并直连已检查 IP；默认一次最多 500 个浏览器请求、32 MiB 双向隧道流量、2 MiB 页面状态及 1 个浏览器任务。
 - 逐跳手动处理最多三次重定向；拒绝非公网 DNS 结果，并通过 `CURLOPT_RESOLVE` 绑定已检查的地址。
 - 解压后的 HTML 上限 2 MiB；总时限 20 秒，连接时限 5 秒。

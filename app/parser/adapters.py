@@ -11,8 +11,8 @@ from app.parser.client import Deadline, PageResponse, XiaohongshuClient
 from app.parser.douyin.browser import DouyinBrowser
 from app.parser.douyin.media import normalize_douyin_note
 from app.parser.douyin.url_rules import douyin_cache_key, is_douyin_host, parse_douyin_url
-from app.parser.media import normalize_note
-from app.parser.state_reader import decode_initial_state, select_note
+from app.parser.media import normalize_mobile_note, normalize_note
+from app.parser.state_reader import decode_initial_state, select_note_layout
 from app.parser.url_rules import cache_key, parse_url
 
 Platform = Literal["xiaohongshu", "douyin"]
@@ -39,7 +39,9 @@ class XiaohongshuAdapter:
         page = await self.client.fetch(raw_url, deadline)
         deadline.remaining()
         state = decode_initial_state(page.html)
-        note = normalize_note(page.note_id, select_note(state, page.note_id))
+        selected = select_note_layout(state, page.note_id)
+        normalize = normalize_mobile_note if selected.mobile else normalize_note
+        note = normalize(page.note_id, selected.payload)
         deadline.remaining()
         return note
 

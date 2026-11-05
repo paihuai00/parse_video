@@ -14,10 +14,23 @@ from curl_cffi.requests import AsyncSession, Response
 
 from app.config import Settings
 from app.errors import AppError
-from app.parser.url_rules import resolve_url
+from app.parser.url_rules import note_status_redirect, parse_url, resolve_url
 
 TEMPORARY_STATUSES = frozenset({500, 502, 504})
 REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
+MOBILE_IMPERSONATE = "safari184_ios"
+
+
+class _NoteStatusRedirect(AppError):
+    def __init__(self, note_id: str) -> None:
+        super().__init__("UPSTREAM_BAD_RESPONSE", 502, detail="upstream note status redirect")
+        self.note_id = note_id
+
+
+@dataclass
+class _FetchBudget:
+    attempts: int = 2
+    redirects: int = 0
 
 
 @dataclass(frozen=True)
@@ -76,30 +89,47 @@ class XiaohongshuClient:
 
     async def fetch(self, raw_url: str, deadline: Deadline) -> PageResponse:
         last_transport_error: Exception | None = None
-        for attempt in range(2):
+        budget = _FetchBudget()
+        impersonate = self.settings.impersonate
+        expected_note_id: str | None = None
+        while budget.attempts:
+            deadline.remaining()
+            budget.attempts -= 1
             try:
-                return await self._fetch_once(raw_url, deadline)
+                return await self._fetch_once(
+                    raw_url, deadline, budget, impersonate, expected_note_id
+                )
+            except _NoteStatusRedirect as exc:
+                if impersonate != MOBILE_IMPERSONATE and budget.attempts:
+                    impersonate = MOBILE_IMPERSONATE
+                    expected_note_id = parse_url(raw_url).note_id or exc.note_id
+                    continue
+                raise
             except AppError as exc:
-                if attempt == 0 and exc.code == "UPSTREAM_BAD_RESPONSE" and exc.retryable:
+                if budget.attempts and exc.code == "UPSTREAM_BAD_RESPONSE" and exc.retryable:
                     continue
                 raise
             except (CurlError, OSError) as exc:
                 if isinstance(exc, CurlError) and exc.code == CurlECode.OPERATION_TIMEDOUT:
                     raise AppError("UPSTREAM_TIMEOUT", 504, True, "curl request timed out") from exc
                 last_transport_error = exc
-                if attempt == 0:
+                if budget.attempts:
                     continue
                 break
         raise AppError(
             "UPSTREAM_BAD_RESPONSE", 502, True, "temporary transport failure"
         ) from last_transport_error
 
-    async def _fetch_once(self, raw_url: str, deadline: Deadline) -> PageResponse:
+    async def _fetch_once(
+        self,
+        raw_url: str,
+        deadline: Deadline,
+        budget: _FetchBudget,
+        impersonate: str,
+        expected_note_id: str | None,
+    ) -> PageResponse:
         current_url = raw_url
-        redirect_count = 0
-        async with AsyncSession(
-            impersonate=cast(Any, self.settings.impersonate), trust_env=False
-        ) as session:
+        async with AsyncSession(impersonate=cast(Any, impersonate), trust_env=False) as session:
             while True:
                 try:
                     hop = await asyncio.wait_for(resolve_url(current_url), deadline.remaining())
@@ -107,6 +137,16 @@ class XiaohongshuClient:
                     raise AppError(
                         "UPSTREAM_TIMEOUT", 504, True, "DNS resolution timed out"
                     ) from exc
+                if (
+                    expected_note_id is not None
+                    and hop.note_id is not None
+                    and hop.note_id != expected_note_id
+                ):
+                    raise AppError(
+                        "UPSTREAM_BAD_RESPONSE",
+                        502,
+                        detail="mobile redirect changed requested note",
+                    )
                 # This option is session-scoped in curl_cffi 0.13.0. Requests in a
                 # parse are sequential, so replacing it before each hop pins that
                 # connection while preserving the session's anonymous cookie jar.
@@ -160,12 +200,20 @@ class XiaohongshuClient:
                         raise AppError(
                             "UPSTREAM_BAD_RESPONSE", 502, detail="redirect lacks Location"
                         )
-                    if redirect_count >= self.settings.max_redirects:
+                    if budget.redirects >= self.settings.max_redirects:
                         raise AppError(
                             "UPSTREAM_BAD_RESPONSE", 502, detail="redirect limit exceeded"
                         )
                     current_url = urljoin(hop.normalized_url, location)
-                    redirect_count += 1
+                    budget.redirects += 1
+                    status_target = note_status_redirect(hop, current_url)
+                    if status_target == "error":
+                        assert hop.note_id is not None
+                        raise _NoteStatusRedirect(hop.note_id)
+                    if status_target == "login":
+                        raise AppError(
+                            "UPSTREAM_LOGIN_REQUIRED", 503, detail="upstream login redirect"
+                        )
                     continue
                 if response.status_code in TEMPORARY_STATUSES:
                     raise AppError("UPSTREAM_BAD_RESPONSE", 502, True, "temporary upstream status")

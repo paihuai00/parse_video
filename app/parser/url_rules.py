@@ -7,6 +7,7 @@ import hashlib
 import ipaddress
 import socket
 from dataclasses import dataclass
+from typing import Literal
 from urllib.parse import SplitResult, urlsplit, urlunsplit
 
 from app.errors import AppError, invalid_url
@@ -94,7 +95,7 @@ def _note_id_from_path(host: str, path: str) -> str | None:
     return note_id.lower()
 
 
-def parse_url(raw_url: str) -> ParsedUrl:
+def _validated_parts(raw_url: str) -> tuple[SplitResult, str, int]:
     if len(raw_url) > 4096:
         raise invalid_url("URL is too long")
     if any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in raw_url):
@@ -116,10 +117,32 @@ def parse_url(raw_url: str) -> ParsedUrl:
     expected_port = 443 if scheme == "https" else 80
     if explicit_port is not None and explicit_port != expected_port:
         raise invalid_url("unexpected port")
-    note_id = _note_id_from_path(host, parts.path)
     netloc = host if explicit_port is None else f"{host}:{explicit_port}"
-    normalized = urlunsplit((scheme, netloc, parts.path, parts.query, ""))
-    return ParsedUrl(normalized, host, expected_port, note_id, host in SHORT_LINK_HOSTS)
+    return parts._replace(scheme=scheme, netloc=netloc), host, expected_port
+
+
+def parse_url(raw_url: str) -> ParsedUrl:
+    parts, host, port = _validated_parts(raw_url)
+    note_id = _note_id_from_path(host, parts.path)
+    return ParsedUrl(urlunsplit(parts), host, port, note_id, host in SHORT_LINK_HOSTS)
+
+
+def note_status_redirect(source: ResolvedHop, target_url: str) -> Literal["error", "login"] | None:
+    """Recognize exact status destinations without admitting them as note URLs."""
+    if source.note_id is None:
+        return None
+    # Non-status destinations still go through the ordinary per-hop resolver.
+    try:
+        path = urlsplit(target_url).path
+    except ValueError as exc:
+        raise invalid_url("malformed redirect URL") from exc
+    if path not in {"/404", "/login"}:
+        return None
+    parts, host, port = _validated_parts(target_url)
+    source_scheme = urlsplit(source.normalized_url).scheme
+    if host != source.host or port != source.port or parts.scheme != source_scheme:
+        raise invalid_url("status redirect changed origin")
+    return "error" if path == "/404" else "login"
 
 
 def is_public_address(address: str) -> bool:

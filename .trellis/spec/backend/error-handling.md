@@ -16,3 +16,7 @@ Parser and service modules raise domain errors and do not construct HTTP respons
 - Returning FastAPI's default validation, 404, or 405 body.
 - Returning upstream HTML, signed URLs, cookies, request headers, or stack traces.
 - Treating an upstream login page as this service's `UNAUTHORIZED` response.
+
+## Xiaohongshu Status Redirects
+
+Validate the status destination's authority using the same URL primitives before classifying a redirect from an already validated note. Exact same-origin `/login` is an upstream login outcome; exact `/404` is a conservative upstream status, not proof that a note is missing. A narrow internal typed status error permits the bounded anonymous mobile strategy while preserving the public envelope. Do not trigger fallback by matching arbitrary diagnostic strings or broad public `INVALID_URL`/`PARSE_FAILED` codes. Invalid authority, arbitrary paths or unsafe DNS remain rejected and must not be retried by another strategy.

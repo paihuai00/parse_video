@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from app.errors import AppError
-from app.parser.media import normalize_media_url, normalize_note
+from app.parser.media import normalize_media_url, normalize_mobile_note, normalize_note
 from app.parser.state_reader import decode_initial_state, select_note
 
 
@@ -192,4 +192,81 @@ def test_mixed_normal_note_with_video_payload_is_rejected() -> None:
     }
     with pytest.raises(AppError) as caught:
         normalize_note("6ad1f8610000000018018eef", note)
+    assert caught.value.code == "UNSUPPORTED_CONTENT"
+
+
+def mobile_note(fixture_html):
+    return select_note(
+        decode_initial_state(fixture_html("mobile_image_note.html")), "aaaaaaaaaaaaaaaaaaaaaaaa"
+    )
+
+
+def test_mobile_preserves_all_images_and_prefers_detail_over_preview(fixture_html) -> None:
+    result = normalize_mobile_note("aaaaaaaaaaaaaaaaaaaaaaaa", mobile_note(fixture_html))
+    assert result.kind == "image"
+    assert result.videos == ()
+    assert result.cover is None
+    assert [x.index for x in result.images] == [1, 2]
+    assert result.images[0].url == ("https://sns-webpic-qc.xhscdn.com/detail-one.jpg?sig=synthetic")
+    assert result.images[1].url.endswith("/detail-two.jpg")
+    assert [(x.source_width, x.source_height) for x in result.images] == [(1400, 1200), (900, 1000)]
+    assert all(x.live_video is None for x in result.images)
+
+
+@pytest.mark.parametrize(
+    "bad_slot",
+    [
+        None,
+        {},
+        {"url": "https://evil.example/image.jpg"},
+        {
+            "url": "https://sns-webpic-qc.xhscdn.com/preview.jpg",
+            "infoList": [
+                {"imageScene": "H5_PRV", "url": "http://sns-webpic-qc.xhscdn.com/preview.jpg"}
+            ],
+        },
+        {"url": "https://sns-webpic-qc.xhscdn.com/a.jpg", "infoList": "invalid"},
+        {"url": "https://sns-webpic-qc.xhscdn.com/a.jpg", "infoList": [None]},
+        {"url": "https://sns-webpic-qc.xhscdn.com/a.jpg", "livePhoto": "false"},
+        {"url": "https://sns-webpic-qc.xhscdn.com/a.jpg", "stream": []},
+    ],
+)
+def test_mobile_never_skips_an_invalid_image_slot(fixture_html, bad_slot) -> None:
+    payload = mobile_note(fixture_html)
+    payload["imageList"].append(bad_slot)
+    with pytest.raises(AppError) as caught:
+        normalize_mobile_note("aaaaaaaaaaaaaaaaaaaaaaaa", payload)
+    assert caught.value.code == "MEDIA_NOT_FOUND"
+
+
+@pytest.mark.parametrize(
+    "motion",
+    [
+        {"livePhoto": True},
+        {"stream": {"h264": [{"masterUrl": "https://sns-video-v6.xhscdn.com/a.mp4"}]}},
+        {"stream": {"unknown": []}},
+        {"videoUrl": "https://sns-video-v6.xhscdn.com/a.mp4"},
+        {"livePhotoUrl": "https://sns-video-v6.xhscdn.com/a.mp4"},
+    ],
+)
+def test_mobile_motion_cannot_be_returned_as_static_image(fixture_html, motion) -> None:
+    payload = mobile_note(fixture_html)
+    payload["imageList"][1].update(motion)
+    with pytest.raises(AppError) as caught:
+        normalize_mobile_note("aaaaaaaaaaaaaaaaaaaaaaaa", payload)
+    assert caught.value.code == "UNSUPPORTED_CONTENT"
+
+
+@pytest.mark.parametrize("images", [None, [], "invalid"])
+def test_mobile_requires_nonempty_image_list(images) -> None:
+    with pytest.raises(AppError) as caught:
+        normalize_mobile_note("aaaaaaaaaaaaaaaaaaaaaaaa", {"type": "normal", "imageList": images})
+    assert caught.value.code == "MEDIA_NOT_FOUND"
+
+
+def test_mobile_video_remains_unsupported(fixture_html) -> None:
+    payload = mobile_note(fixture_html)
+    payload["type"] = "video"
+    with pytest.raises(AppError) as caught:
+        normalize_mobile_note("aaaaaaaaaaaaaaaaaaaaaaaa", payload)
     assert caught.value.code == "UNSUPPORTED_CONTENT"

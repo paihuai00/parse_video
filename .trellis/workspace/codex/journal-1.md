@@ -56,3 +56,34 @@
 ### Next Steps
 
 - 如需实施，单独修复上游状态跳转错误分类并增加完整跳转链回归测试；线上具体跳转仍需服务器出口证据。
+
+
+## Session 3: 小红书匿名移动页修复完成与部署移交
+
+**Date**: 2026-11-05
+**Task**: 小红书匿名移动页修复完成与部署移交
+**Branch**: `main`
+
+### Summary
+
+实现有界iOS匿名兜底、移动状态及完整静态图片适配；190项离线检查和独立复核通过，原始短/长链本地API及JPEG检查通过。用户确认本地Postman正常，明确要求归档并自行Git提交；归档和journal均禁用自动提交，VPS部署与剩余媒体/API/调用方验收移交用户VPS Codex。
+
+### Main Changes
+
+- 已归档11-04-xhs-share-access-compatibility；未执行git add/commit/push。
+
+### Git Commits
+
+(No commits - planning session)
+
+### Testing
+
+- [OK] Python3.12.16：190 passed；Ruff/Mypy/compile/OpenAPI/Compose静态检查通过；本地真实API和Postman CLI成功。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 用户手动提交并同步VPS；按部署prompt保留旧镜像、重建并重建容器、核对源码和镜像、执行VPS媒体及公网验收，失败回滚。

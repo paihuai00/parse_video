@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterator
+from dataclasses import dataclass
 from typing import Any
 
 from app.errors import AppError
@@ -12,6 +13,12 @@ MARKER = "window.__INITIAL_STATE__"
 MAX_STATE_CHARS = 2 * 1024 * 1024
 MAX_DEPTH = 80
 MAX_NODES = 200_000
+
+
+@dataclass(frozen=True)
+class SelectedNote:
+    payload: dict[str, Any]
+    mobile: bool
 
 
 def _skip_space(text: str, index: int) -> int:
@@ -144,6 +151,12 @@ def decode_initial_state(html: str) -> dict[str, Any]:
 
 
 def select_note(state: dict[str, Any], note_id: str) -> dict[str, Any]:
+    return select_note_layout(state, note_id).payload
+
+
+def select_note_layout(state: dict[str, Any], note_id: str) -> SelectedNote:
+    if "note" not in state:
+        return SelectedNote(_select_mobile_note(state, note_id), mobile=True)
     note_root = state.get("note")
     if not isinstance(note_root, dict):
         raise AppError("PARSE_FAILED", 502, detail="note state is missing")
@@ -156,4 +169,20 @@ def select_note(state: dict[str, Any], note_id: str) -> dict[str, Any]:
     note = entry.get("note")
     if not isinstance(note, dict):
         raise AppError("PARSE_FAILED", 502, detail="requested note payload is missing")
+    return SelectedNote(note, mobile=False)
+
+
+def _select_mobile_note(state: dict[str, Any], note_id: str) -> dict[str, Any]:
+    root = state.get("noteData")
+    if not isinstance(root, dict) or root.get("hasError") is not False:
+        raise AppError("PARSE_FAILED", 502, detail="mobile note state is absent or has an error")
+    data = root.get("data")
+    if not isinstance(data, dict):
+        raise AppError("PARSE_FAILED", 502, detail="mobile note data is missing")
+    note = data.get("noteData")
+    if not isinstance(note, dict):
+        raise AppError("PARSE_FAILED", 502, detail="mobile note payload is missing")
+    actual_id = note.get("noteId")
+    if not isinstance(actual_id, str) or actual_id.lower() != note_id:
+        raise AppError("PARSE_FAILED", 502, detail="mobile requested note id is absent from state")
     return note

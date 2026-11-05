@@ -99,6 +99,58 @@ def _cover_from_images(items: Any) -> InternalCover | None:
     return None
 
 
+def _mobile_image_url(item: dict[str, Any]) -> str | None:
+    info_list = item.get("infoList", [])
+    if not isinstance(info_list, list) or any(not isinstance(info, dict) for info in info_list):
+        return None
+    previews = {
+        normalize_media_url(info.get("url"))
+        for info in info_list
+        if info.get("imageScene") == "H5_PRV"
+    }
+    details = [info.get("url") for info in info_list if info.get("imageScene") == "H5_DTL"]
+    for candidate in details:
+        url = normalize_media_url(candidate)
+        if url:
+            return url
+    # An unlabeled direct URL must not turn a known preview into a full image.
+    direct = normalize_media_url(item.get("url"))
+    return direct if direct and direct not in previews else None
+
+
+def normalize_mobile_note(note_id: str, note: dict[str, Any]) -> InternalNote:
+    """Normalize only positively complete mobile static-image notes."""
+    if note.get("type") != "normal" or note.get("video") is not None:
+        raise AppError("UNSUPPORTED_CONTENT", 422, detail="mobile note type is unsupported")
+    images = note.get("imageList")
+    if not isinstance(images, list) or not images:
+        raise AppError("MEDIA_NOT_FOUND", 502, detail="mobile body images are missing")
+    normalized: list[InternalImage] = []
+    for item in images:
+        if not isinstance(item, dict):
+            raise AppError("MEDIA_NOT_FOUND", 502, detail="mobile image slot is malformed")
+        if "livePhoto" in item and not isinstance(item["livePhoto"], bool):
+            raise AppError("MEDIA_NOT_FOUND", 502, detail="mobile image motion marker is malformed")
+        stream = item.get("stream", {})
+        if not isinstance(stream, dict):
+            raise AppError("MEDIA_NOT_FOUND", 502, detail="mobile image stream is malformed")
+        if _is_live_photo(item) or stream:
+            raise AppError("UNSUPPORTED_CONTENT", 422, detail="mobile motion image is unsupported")
+        url = _mobile_image_url(item)
+        if url is None:
+            raise AppError("MEDIA_NOT_FOUND", 502, detail="mobile detail image is missing")
+        normalized.append(
+            InternalImage(
+                url,
+                _positive_int(item.get("width")),
+                _positive_int(item.get("height")),
+                len(normalized) + 1,
+            )
+        )
+    title = _text(note.get("title")) or _text(note.get("desc"))
+    return InternalNote(note_id, title, "image", tuple(normalized), (), None)
+
+
 def _stream_candidates(stream: Any) -> list[dict[str, Any]]:
     if not isinstance(stream, dict):
         return []

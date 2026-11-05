@@ -1,0 +1,8 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Supported Python 3.12 checks and sanitized offline fixtures."}
+{"file":".trellis/spec/backend/service-contract.md","reason":"Verify negative URL/transport boundaries and existing success guarantees."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Verify full-chain errors without invented upstream-code semantics."}
+{"file":".trellis/tasks/archive/2026-11/11-04-xhs-share-access-compatibility/research/share-link-comparison.md","reason":"Keep local, deployed, anonymous-browser and user-observed evidence distinct."}
+{"file":".trellis/tasks/archive/2026-11/11-04-xhs-share-access-compatibility/research/alternative-acquisition.md","reason":"Verify mobile note identity, H5 detail images, static-only evidence scope and shared bounds."}
+{"file":".trellis/tasks/archive/2026-11/11-04-xhs-share-access-compatibility/research/vps-deployment-impact.md","reason":"Do not substitute local/health evidence for native VPS egress and caller-media acceptance."}
+{"file":".trellis/tasks/archive/2026-11/11-04-xhs-share-access-compatibility/research/vps-verification-report.md","reason":"Keep verified VPS short-link acquisition distinct from unverified streams, media, long-link and API behavior."}
+{"file":".trellis/tasks/archive/2026-11/11-04-xhs-share-access-compatibility/research/planning-readiness.md","reason":"Check no scope drift, unsafe fallback or silent partial mobile result; source-baseline equivalence is established."}

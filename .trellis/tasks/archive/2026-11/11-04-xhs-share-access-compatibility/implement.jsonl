@@ -1,0 +1,8 @@
+{"file":".trellis/spec/backend/service-contract.md","reason":"Preserve anonymous acquisition, strict URL/DNS/pinning, deadlines and public envelope."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Separate unsupported input from evidenced upstream state; unknown /404 is not deletion."}
+{"file":".trellis/spec/backend/logging-guidelines.md","reason":"Keep share parameters, cookies and upstream bodies out of diagnostics."}
+{"file":".trellis/tasks/archive/2026-11/11-04-xhs-share-access-compatibility/research/share-link-comparison.md","reason":"Real paired-link evidence and limitations; qualify acquisition changes before implementation."}
+{"file":".trellis/tasks/archive/2026-11/11-04-xhs-share-access-compatibility/research/alternative-acquisition.md","reason":"Positive anonymous iOS mobile state and image evidence; exact observed schema and media-completeness limits."}
+{"file":".trellis/tasks/archive/2026-11/11-04-xhs-share-access-compatibility/research/vps-deployment-impact.md","reason":"Linux VPS target, deployment egress qualification, runtime architecture and realistic probe delivery."}
+{"file":".trellis/tasks/archive/2026-11/11-04-xhs-share-access-compatibility/research/vps-verification-report.md","reason":"User-relayed real-container short-link acquisition success, deployment baseline and remaining acceptance gaps."}
+{"file":".trellis/tasks/archive/2026-11/11-04-xhs-share-access-compatibility/research/planning-readiness.md","reason":"Final source-baseline check, narrow fallback scope and mobile per-slot completeness requirement."}

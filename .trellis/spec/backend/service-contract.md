@@ -48,6 +48,9 @@ class ParseService:
 class XiaohongshuClient:
     async def fetch(self, raw_url: str, deadline: Deadline) -> PageResponse: ...
 
+def select_note_layout(state: dict[str, Any], note_id: str) -> SelectedNote: ...
+def normalize_mobile_note(note_id: str, note: dict[str, Any]) -> InternalNote: ...
+
 class DouyinBrowser:
     async def fetch_detail(
         self, raw_url: str, deadline: Deadline
@@ -78,6 +81,8 @@ Success response invariants:
 - The legacy route accepts only Xiaohongshu and retains the 24-hex `note_id` schema and public messages. The unified route auto-detects the platform and accepts either a 24-hex Xiaohongshu ID or an 18-20 digit Douyin ID; both routes build fresh caller metadata from the same internal result.
 - A Douyin static image work preserves every upstream image slot in order, assigns one-based indexes, returns `videos=[]` and `cover=null`, and rejects a missing slot or motion-bearing slot instead of returning a partial result.
 - A Douyin normal video returns one positively identified MP4 and an optional independent cover. Candidate URL, dimensions, codec, quality, duration, and size come from one selected variant; an exact, independently evidenced CDN host is required.
+- A Xiaohongshu mobile static note requires exact `noteData.data.noteData` with outer `hasError is False` and matching `noteId`. `SelectedNote(payload, mobile)` keeps the source layout through adapter normalization; the compatibility `select_note()` still returns the payload. Malformed desktop state cannot be rescued by unrelated shadow mobile data.
+- Mobile normalization accepts only positively complete `type="normal"` static images: every slot must have a legal detail candidate, in original order. Prefer `H5_DTL`, then a direct image URL that is not a known `H5_PRV` preview. Reject malformed or missing slots and preview-only results instead of returning a partial list. Motion evidence, nonempty stream dictionaries or mobile video cannot silently become a static-image success. Desktop video/Live Photo behavior is unchanged.
 
 Environment keys:
 
@@ -98,7 +103,9 @@ Environment keys:
 | `XHS_DOUYIN_STATE_MAX_BYTES` | `2097152` cumulative detail/Flight state |
 | `XHS_DOUYIN_BROWSER_CHANNEL` | Optional Playwright channel override; container uses bundled `chromium` |
 
-Upstream connections use `curl_cffi==0.13.0`, explicit `chrome136`, `trust_env=False`, manual redirects, TLS verification, and a fresh anonymous session per parse. Before every hop, validate all resolved addresses as public unicast and replace the session-level `CurlOpt.RESOLVE` entry with the vetted host/port/address set.
+Upstream connections use `curl_cffi==0.13.0`, desktop `chrome136` by default, `trust_env=False`, manual redirects, TLS verification, and independent anonymous sessions per strategy. Only a validated note response redirecting to exact same-origin `/404` is eligible for one `safari184_ios` fallback on the original full input URL. The internal typed status error remains public `UPSTREAM_BAD_RESPONSE` if no fallback remains; neither `/404` nor unknown `errorCode` proves deletion. Exact same-origin `/login` maps to `UPSTREAM_LOGIN_REQUIRED` without fetching it. Caller URL parsing remains strict and does not accept either status path.
+
+All desktop retries and mobile fallback share two total attempts, the original `Deadline`, admission state and the parse-wide configured redirect limit (default three). The mobile strategy binds to the note ID established by the original long URL or desktop-resolved short link; a mobile redirect cannot substitute another note. Arbitrary paths, credentials, changed status origin, unsafe DNS/redirects, explicit login/challenge/throttle, timeout and generic parse errors do not trigger fallback. Before every connection, validate all resolved addresses as public unicast and replace session-level `CurlOpt.RESOLVE` with the vetted host/port/address set. Do not broaden URL or media hosts to make fallback succeed.
 
 Douyin acquisition starts a fresh Chromium process and anonymous context for one parse. Chromium uses only a loopback CONNECT proxy; the proxy accepts exact allowlisted HTTPS hosts, resolves them with a shared bounded timeout, rejects any non-public answer, and connects to the vetted IP so Chromium cannot re-resolve externally. Page routing allows only required document/script/XHR/fetch types, caps requests and tunnel bytes, blocks service workers, and uses the original 20-second `Deadline`. Detail responses are keyed by work ID so unrelated recommendations cannot win a race. React Flight scripts are read incrementally with a cumulative browser-side byte cap, including scripts appended after initial DOM load. Cancellation, timeout, browser failure, or proxy shutdown must close and await contexts, processes, tunnels, and handler tasks.
 
@@ -115,11 +122,14 @@ Host allowlisting is exact, never suffix-based. ASCII host case and at most one 
 | Unknown route / wrong method | `404 ROUTE_NOT_FOUND` / `405 METHOD_NOT_ALLOWED` |
 | Body over the HTTP input limit | `413 INPUT_TOO_LARGE` |
 | Live broadcast, unsupported work type, unrelated mixed media, or Douyin motion image | `422 UNSUPPORTED_CONTENT` |
+| Mobile Xiaohongshu video or motion-bearing image | `422 UNSUPPORTED_CONTENT`; never return a still-only result |
+| Mobile missing/malformed image slot or no supported detail image | `502 MEDIA_NOT_FOUND`; never skip the slot |
 | Declared/equivalent Live Photo missing a valid still or supported MP4 | `502 MEDIA_NOT_FOUND`; never return partial static-only success |
 | Per-key request window exceeded | `429 RATE_LIMITED` with `Retry-After` |
 | Queue full or wait expired | `503 BUSY` with `Retry-After` |
 | Login/challenge/upstream throttle | `503 UPSTREAM_LOGIN_REQUIRED`, `UPSTREAM_ACCESS_RESTRICTED`, or `UPSTREAM_RATE_LIMITED` |
 | Response/charset invalid, state unreadable, supported media absent | `502 UPSTREAM_BAD_RESPONSE`, `PARSE_FAILED`, or `MEDIA_NOT_FOUND` |
+| Exact safe note-to-`/404` redirect with no remaining fallback, including unknown upstream error codes | `502 UPSTREAM_BAD_RESPONSE`, not evidence of `NOTE_NOT_FOUND` |
 | Original total deadline exhausted | `504 UPSTREAM_TIMEOUT` |
 | Unhandled defect | `500 INTERNAL_ERROR` without diagnostic leakage |
 
@@ -136,6 +146,8 @@ Every application and framework error uses `ParseError`. Nginx-generated 413/502
 - Contract: runtime OpenAPI and checked-in `docs/openapi.json` accept the request, ordinary-image, Live Photo, normal-video, error, and health examples; `ImageMedia.live_video` remains a structured optional field with `additionalProperties=false`; unexpected response fields fail.
 - Unified contract: both routes use the same request and envelope; the legacy route keeps 24-hex IDs and Xiaohongshu wording; the unified route accepts decimal Douyin IDs and neutral wording; cross-route Xiaohongshu work shares cache/admission/rate budgets while platform cache identities stay isolated.
 - URL/transport: rejected hosts and address classes never reach transport; exact `.cn` mobile paths succeed while `.cn` lookalikes/other paths and unsafe redirects fail before connection; each redirect installs only the current vetted `CurlOpt.RESOLVE`; environment proxies are disabled; DNS and parsing consume the original deadline; a body above 2 MiB aborts.
+- Mobile acquisition: test full short-link→detail→same-origin `/404`→fresh iOS strategy→matched mobile note; exact status origin/credentials/ports/paths, no fetch of status pages, no fallback on unsafe inputs, and conservative repeated-status errors. Two-attempt and redirect limits span both strategies and retries; verify remaining deadline, mobile target-ID binding and cancellation cleanup.
+- Mobile media: explicit `hasError=false`, ID mismatch and layout ambiguity, all image slots/types/order/dimensions, `H5_DTL` priority, normalized preview equivalence, unknown hosts, malformed/nonempty streams and motion markers. Verify full ParseService/API flows for both routes, shared cache with fresh caller metadata and failure without partial images. Use synthetic fixtures; live identity/media evidence stays redacted.
 - Parser/media: string-contained `undefined` is preserved, value-token `undefined` becomes null, the requested note ID is selected, image order and Live Photo ownership are stable, normal and per-image streams share deterministic MP4 selection, empty streams stay ordinary, missing Live Photo MP4 and unknown CDN/mixed media fail.
 - Service: success-only TTL/LRU, refresh bypass, two active leaders, four total waiters including followers, per-caller metadata, orphan cancellation/await, and cleanup on timeout/cancellation.
 - Douyin browser: exact work-ID response binding, incrementally bounded Flight scripts, exact egress hosts, private/mixed DNS rejection, pinned CONNECT targets, request/tunnel/state limits, fresh contexts, browser startup failure isolation, total-deadline cancellation, handler/process cleanup, and motion-image rejection.
@@ -172,6 +184,16 @@ Correct: key captured detail responses by the target work ID, ignore unrelated d
 Wrong: flatten Live Photo clips into top-level `videos` or return only their still images. Flattening loses the owning image position; static-only success silently drops supported motion content.
 
 Correct: keep image-note `videos=[]`, preserve the ordered still, and attach the selected clip as that image's optional `live_video`. If a marked Live Photo cannot produce both parts, return `MEDIA_NOT_FOUND`.
+
+Wrong: pass a mobile payload through desktop normalization or catch every `INVALID_URL`/`PARSE_FAILED` to try another client. This can skip image slots, use previews, retry unsafe destinations or hide unrelated failures.
+
+Correct: retain exact layout and normalize through its validated branch; only the typed safe note-status redirect can select the mobile strategy.
+
+```python
+selected = select_note_layout(state, page.note_id)
+normalize = normalize_mobile_note if selected.mobile else normalize_note
+note = normalize(page.note_id, selected.payload)
+```
 
 Wrong: annotate a Pydantic wrap serializer as returning a generic `dict` without checking generated schema. Pydantic may use that annotation as the serialization schema and FastAPI can collapse the model to a bare object.
 

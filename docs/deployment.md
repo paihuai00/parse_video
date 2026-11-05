@@ -6,7 +6,7 @@
 
 - Python 3.12，基础镜像采用 `python:3.12.8-slim-bookworm`；仍需在目标 Linux 架构验证镜像构建。
 - FastAPI + Uvicorn，固定 **1 个 worker**，容器内监听 `0.0.0.0:8000`。
-- 固定 `curl_cffi==0.13.0` 和 `XHS_IMPERSONATE=chrome136`，保留 TLS 证书验证。已验证的本地匿名请求组合是第一版基线，升级库或浏览器配置必须重新验证样本。
+- 固定 `curl_cffi==0.13.0` 和桌面 `XHS_IMPERSONATE=chrome136`，保留 TLS 证书验证。安全详情页跳向同主机精确 `/404` 时，客户端可用固定 `safari184_ios` 做一次匿名移动获取；无需安装 Safari、macOS 或 iOS。不要仅修改环境变量替代完整的移动状态/图片适配；升级库或请求配置仍需重新验证样本。
 - 固定 `playwright==1.64.0` 及配套 Chromium。抖音解析使用新的匿名浏览器进程和上下文，完整 Chromium 沙箱开启；应用进程仍以 UID/GID 10001 运行。
 - 单进程使用内存缓存、并发限制和有界等待队列，不依赖数据库、Redis 或任务服务。重启清空这些内存状态；增加 worker 会让限流与缓存分裂，不能直接作为扩容办法。
 - API 只返回图片、每张小红书图片可选的 Live Photo 动态 MP4、普通视频主地址及元数据，不代理、保存或转码媒体。调用方直接访问对应平台 CDN。
@@ -183,6 +183,12 @@ location = /api/v1/parse {
 修改后先运行 `nginx -t`，检查通过再按现有部署方式 reload；不直接替换全局配置或重启其他站点。
 
 ## 5. VPS 与调用方两端验收
+
+### 匿名移动页适配验收
+
+2026-11-04 的本机探测对一个授权短链及其 PC 长链取得了匹配目标的移动端普通静态图文，并对一张代表图片验证了 `206/image/jpeg` 和 JPEG 文件头。用户转述的 VPS Codex 报告在实际 `x86_64/Python 3.12.8/curl_cffi 0.13.0` 应用容器内确认了短链移动页获取；该报告未验证 PC 长链、图片 `stream` 内容、VPS 媒体 Range、完整产品 API 或真实调用方读取。因此这些证据不代表本次修复已经部署成功。
+
+候选代码完成后，按[移动页 VPS 验收命令](vps-xhs-mobile-acceptance.md)补齐这些步骤。健康检查、公网入口正常和平台页面 HTTP 200 都不能替代目标笔记与媒体验证。应用设置 `trust_env=False`，宿主机 `HTTP_PROXY/HTTPS_PROXY` 不会自动改变该客户端出口；Cloudflare/Nginx 入站链路也不会改变现有配置下的小红书出站地址。
 
 ### 5.1 已记录的 VPS Live Photo case（2026-10-19）
 
