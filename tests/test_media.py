@@ -4,7 +4,132 @@ import pytest
 
 from app.errors import AppError
 from app.parser.media import normalize_media_url, normalize_mobile_note, normalize_note
-from app.parser.state_reader import decode_initial_state, select_note
+from app.parser.state_reader import decode_initial_state, select_note, select_note_layout
+
+
+@pytest.mark.parametrize("candidate_source", ["urlDefault", "WB_DFT"])
+def test_synthetic_rednote_web_image_is_selected_and_normalized(
+    fixture_html, candidate_source
+) -> None:
+    state = decode_initial_state(fixture_html("synthetic_rednote_web_image_note.html"))
+    assert state["comment"]["originalCommentIds"] == ["synthetic-comment"]
+    assert state["comment"]["cursor"] is None
+    selected = select_note_layout(state, "aaaaaaaaaaaaaaaaaaaaaaaa")
+    assert selected.mobile is False
+    note = selected.payload
+    assert note["desc"] is None
+    if candidate_source == "WB_DFT":
+        note["imageList"][0]["urlDefault"] = None
+    result = normalize_note("aaaaaaaaaaaaaaaaaaaaaaaa", note)
+    assert result.title == "Synthetic rednote web image fixture"
+    assert result.videos == ()
+    assert len(result.images) == 1
+    expected_path = (
+        "synthetic-default.jpg" if candidate_source == "urlDefault" else "synthetic-detail.jpg"
+    )
+    assert result.images[0].url == (
+        f"https://sns-web-i10.rednotecdn.com/{expected_path}?sig=synthetic"
+    )
+    assert result.images[0].live_video is None
+
+
+def test_new_regional_host_is_image_only_and_keeps_existing_url_normalization() -> None:
+    url = "http://sns-web-i10.rednotecdn.com/synthetic.jpg?sig=synthetic#discard"
+    assert normalize_media_url(url) == (
+        "https://sns-web-i10.rednotecdn.com/synthetic.jpg?sig=synthetic"
+    )
+    assert normalize_media_url(url, kind="video") is None
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://sns-web-i10.rednotecdn.com.evil.example/image.jpg",
+        "https://evil-sns-web-i10.rednotecdn.com/image.jpg",
+        "https://sns-web-i10.evilrednotecdn.com/image.jpg",
+        "https://sns-web-i11.rednotecdn.com/image.jpg",
+        "https://sns-web-i999.rednotecdn.com/image.jpg",
+        "https://sns-web-i\uff11\uff10.rednotecdn.com/image.jpg",
+        "https://user:pass@sns-web-i10.rednotecdn.com/image.jpg",
+        "https://sns-web-i10.rednotecdn.com:444/image.jpg",
+        "https://sns-web-i10.rednotecdn.com:80/image.jpg",
+        "http://sns-web-i10.rednotecdn.com:443/image.jpg",
+        "https://sns-web-i10.rednotecdn.com:bad/image.jpg",
+        "ftp://sns-web-i10.rednotecdn.com/image.jpg",
+        "file://sns-web-i10.rednotecdn.com/image.jpg",
+        "//sns-web-i10.rednotecdn.com/image.jpg",
+    ],
+)
+def test_rednote_web_image_host_rejects_unsafe_or_unobserved_urls(url: str) -> None:
+    assert normalize_media_url(url) is None
+
+
+@pytest.mark.parametrize("note_type", ["normal", "video"])
+@pytest.mark.parametrize("candidate_field", ["masterUrl", "backupUrls"])
+def test_new_image_host_never_becomes_a_video_or_live_photo_mp4(note_type, candidate_field) -> None:
+    candidate = {
+        "format": "mp4",
+        candidate_field: (
+            "https://sns-web-i10.rednotecdn.com/synthetic.mp4"
+            if candidate_field == "masterUrl"
+            else ["https://sns-web-i10.rednotecdn.com/synthetic.mp4"]
+        ),
+    }
+    stream = {"h264": [candidate]}
+    note = (
+        {"type": "video", "video": {"media": {"stream": stream}}}
+        if note_type == "video"
+        else {
+            "type": "normal",
+            "imageList": [
+                {
+                    "urlDefault": "https://sns-webpic-qc.xhscdn.com/synthetic-still.jpg",
+                    "livePhoto": True,
+                    "stream": stream,
+                }
+            ],
+        }
+    )
+    with pytest.raises(AppError) as caught:
+        normalize_note("aaaaaaaaaaaaaaaaaaaaaaaa", note)
+    assert caught.value.code == "MEDIA_NOT_FOUND"
+
+
+def test_new_image_host_as_video_master_does_not_hide_supported_backup() -> None:
+    result = normalize_note(
+        "aaaaaaaaaaaaaaaaaaaaaaaa",
+        {
+            "type": "video",
+            "video": {
+                "media": {
+                    "stream": {
+                        "h264": [
+                            {
+                                "masterUrl": "https://sns-web-i10.rednotecdn.com/synthetic.mp4",
+                                "backupUrls": ["http://sns-bak-v1.xhscdn.com/synthetic.mp4"],
+                            }
+                        ]
+                    }
+                }
+            },
+        },
+    )
+    assert result.videos[0].url == "https://sns-bak-v1.xhscdn.com/synthetic.mp4"
+
+
+def test_new_image_host_retains_mobile_preview_protection() -> None:
+    preview = "http://sns-web-i10.rednotecdn.com/synthetic-preview.jpg"
+    with pytest.raises(AppError) as caught:
+        normalize_mobile_note(
+            "aaaaaaaaaaaaaaaaaaaaaaaa",
+            {
+                "type": "normal",
+                "imageList": [
+                    {"url": preview, "infoList": [{"imageScene": "H5_PRV", "url": preview}]}
+                ],
+            },
+        )
+    assert caught.value.code == "MEDIA_NOT_FOUND"
 
 
 @pytest.mark.parametrize(

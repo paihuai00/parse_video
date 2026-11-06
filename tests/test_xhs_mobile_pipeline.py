@@ -56,6 +56,86 @@ def mobile_pipeline(monkeypatch, html):
 
 
 @pytest.mark.parametrize("route", ["/api/v1/xiaohongshu/parse", "/api/v1/parse"])
+@pytest.mark.parametrize("candidate_source", ["urlDefault", "WB_DFT"])
+def test_synthetic_rednote_web_image_host_through_full_desktop_api_chain(
+    monkeypatch, fixture_html, route, candidate_source
+) -> None:
+    html = fixture_html("synthetic_rednote_web_image_note.html")
+    if candidate_source == "WB_DFT":
+        html = html.replace(
+            '"urlDefault":"http://sns-web-i10.rednotecdn.com/synthetic-default.jpg?sig=synthetic"',
+            '"urlDefault":null',
+        )
+    http = mobile_pipeline(monkeypatch, "")
+    regional_url = DETAIL_URL.replace("www.xiaohongshu.com", "www.rednote.com")
+    PipelineSession.responses = [
+        (302, {"location": DETAIL_URL}, b""),
+        (302, {"location": regional_url}, b""),
+        (200, {}, html.encode()),
+    ]
+    with http:
+        response = http.post(
+            route,
+            headers={"X-API-Key": "test-key"},
+            json={"url": SHORT_URL, "refresh": True},
+        )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is True
+    assert payload["error"] is None
+    assert payload["data"]["note_id"] == NOTE_ID
+    assert payload["data"]["videos"] == []
+    assert payload["meta"]["cache"]["hit"] is False
+    images = payload["data"]["images"]
+    assert len(images) == 1
+    expected_path = (
+        "synthetic-default.jpg" if candidate_source == "urlDefault" else "synthetic-detail.jpg"
+    )
+    assert images[0]["url"] == (f"https://sns-web-i10.rednotecdn.com/{expected_path}?sig=synthetic")
+    assert "live_video" not in images[0]
+    assert PipelineSession.calls == [
+        ("chrome136", SHORT_URL),
+        ("chrome136", DETAIL_URL),
+        ("chrome136", regional_url),
+    ]
+
+
+@pytest.mark.parametrize("route", ["/api/v1/xiaohongshu/parse", "/api/v1/parse"])
+def test_synthetic_rednote_new_still_host_keeps_existing_live_photo_pair(
+    monkeypatch, fixture_html, route
+) -> None:
+    # Synthetic compatibility case, not evidence of the VPS Live Photo sample's hosts.
+    html = fixture_html("synthetic_rednote_web_image_note.html").replace(
+        '"livePhoto":false',
+        '"livePhoto":true,"stream":{"h264":[{'
+        '"masterUrl":"http://sns-video-v4.xhscdn.com/synthetic-motion.mp4?sig=synthetic"'
+        "}]}",
+    )
+    http = mobile_pipeline(monkeypatch, "")
+    regional_url = DETAIL_URL.replace("www.xiaohongshu.com", "www.rednote.com")
+    PipelineSession.responses = [
+        (302, {"location": DETAIL_URL}, b""),
+        (302, {"location": regional_url}, b""),
+        (200, {}, html.encode()),
+    ]
+    with http:
+        response = http.post(
+            route,
+            headers={"X-API-Key": "test-key"},
+            json={"url": SHORT_URL, "refresh": True},
+        )
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["videos"] == []
+    assert len(data["images"]) == 1
+    assert data["images"][0]["url"].startswith("https://sns-web-i10.rednotecdn.com/")
+    assert data["images"][0]["live_video"]["url"] == (
+        "https://sns-video-v4.xhscdn.com/synthetic-motion.mp4?sig=synthetic"
+    )
+    assert [profile for profile, _ in PipelineSession.calls] == ["chrome136"] * 3
+
+
+@pytest.mark.parametrize("route", ["/api/v1/xiaohongshu/parse", "/api/v1/parse"])
 @pytest.mark.parametrize(
     ("fixture_name", "image_count", "motion_count"),
     [("mobile_image_note.html", 2, 0), ("synthetic_mobile_live_photo_note.html", 1, 1)],

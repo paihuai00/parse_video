@@ -49,6 +49,7 @@ class XiaohongshuClient:
     async def fetch(self, raw_url: str, deadline: Deadline) -> PageResponse: ...
 
 def decode_initial_state(html: str) -> dict[str, Any]: ...
+def normalize_media_url(value: Any, *, kind: Literal["image", "video"] = "image") -> str | None: ...
 def select_note_layout(state: dict[str, Any], note_id: str) -> SelectedNote: ...
 def normalize_mobile_note(note_id: str, note: dict[str, Any]) -> InternalNote: ...
 
@@ -116,6 +117,8 @@ Douyin acquisition starts a fresh Chromium process and anonymous context for one
 Host allowlisting is exact, never suffix-based. ASCII host case and at most one terminal DNS root dot are canonicalized; repeated trailing dots are rejected. `xhslink.cn` is accepted only for `/o/<token>` where the token is one non-empty ASCII URL-safe segment (`A-Z`, `a-z`, `0-9`, `-`, `_`). Its subdomains, lookalikes, encoded slashes or backslashes, dot traversal, extra path segments, Unicode tokens, overlong URLs, and other paths fail before connection. A short-link redirect receives the same host/path, DNS, address, port, TLS, and redirect-budget checks as the initial URL.
 
 Initial-state extraction balances objects/arrays while respecting double-quoted strings and escapes. Its original source span is at most 2 Mi characters (inclusive), with at most 80 nested containers. Before JSON decoding, a string-aware value scanner converts only value-token `undefined` to null and exact `new Set(array)` to an array, requiring one literal array argument and the closing parenthesis. Constructor tokens permit ASCII JSON whitespace. Preserve array order, values and duplicates: this is data normalization, not execution or Set semantics. Do not change quoted keys/values, support arbitrary constructors/expressions, or globally replace text. Nested supported Set arrays consume the same container-depth budget; decoded values still obey the 200,000-node cap. Unsupported/malformed serialization remains `PARSE_FAILED` without mobile fallback. See the explicitly synthetic fixtures and VPS verification in `docs/rednote-set-state-fix-2026-11-06.md`.
+
+The separately evidenced exact `sns-web-i10.rednotecdn.com` is an additional image-only host. Do not expand this into a numbered `sns-web-i` pattern or a rednotecdn suffix rule. Image URL normalization (the default context) accepts it with the existing HTTP-to-HTTPS, query, credentials, port and scheme rules. All MP4 master/backup candidates explicitly use `kind="video"`, excluding this addition for both normal videos and per-image motion. Legacy shared hosts and the existing `sns-i<ASCII digits>` namespace retain their previous behavior. Synthetic desktop tests combine Set/undefined syntax, requested-ID selection and both `urlDefault`/`WB_DFT` paths through both API routes. Host acceptance does not prove real image readability or establish the VPS Live Photo sample's actual hosts; evidence boundaries are recorded in `docs/rednote-web-image-host-fix-2026-11-06.md`.
 
 ### 4. Validation & Error Matrix
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import urlsplit, urlunsplit
 
 from app.errors import AppError
@@ -22,6 +22,7 @@ ALLOWED_MEDIA_HOSTS = frozenset(
     }
 )
 REGIONAL_IMAGE_HOST = re.compile(r"sns-i[0-9]+\.rednotecdn\.com", re.ASCII)
+IMAGE_ONLY_HOSTS = frozenset({"sns-web-i10.rednotecdn.com"})
 
 
 def _positive_int(value: Any) -> int | None:
@@ -44,7 +45,7 @@ def _text(value: Any) -> str | None:
     return value.strip() if isinstance(value, str) and value.strip() else None
 
 
-def normalize_media_url(value: Any) -> str | None:
+def normalize_media_url(value: Any, *, kind: Literal["image", "video"] = "image") -> str | None:
     if not isinstance(value, str) or len(value) > 8192:
         return None
     try:
@@ -52,7 +53,11 @@ def normalize_media_url(value: Any) -> str | None:
     except ValueError:
         return None
     host = (parts.hostname or "").lower().rstrip(".")
-    if host not in ALLOWED_MEDIA_HOSTS and REGIONAL_IMAGE_HOST.fullmatch(host) is None:
+    if (
+        host not in ALLOWED_MEDIA_HOSTS
+        and REGIONAL_IMAGE_HOST.fullmatch(host) is None
+        and not (kind == "image" and host in IMAGE_ONLY_HOSTS)
+    ):
         return None
     try:
         port = parts.port
@@ -179,13 +184,13 @@ def _stream_candidates(stream: Any) -> list[dict[str, Any]]:
 
 def _candidate_urls(candidate: dict[str, Any]) -> list[str]:
     urls: list[str] = []
-    direct = normalize_media_url(candidate.get("masterUrl"))
+    direct = normalize_media_url(candidate.get("masterUrl"), kind="video")
     if direct:
         urls.append(direct)
     backups = candidate.get("backupUrls")
     if isinstance(backups, list):
         for item in backups:
-            url = normalize_media_url(item)
+            url = normalize_media_url(item, kind="video")
             if url and url not in urls:
                 urls.append(url)
     return urls
