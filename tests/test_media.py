@@ -6,6 +6,94 @@ from app.errors import AppError
 from app.parser.media import normalize_media_url, normalize_mobile_note, normalize_note
 from app.parser.state_reader import decode_initial_state, select_note, select_note_layout
 
+REGIONAL_VIDEO_HOSTS = (
+    "sns-v28.rednotecdn.com",
+    "sns-v11.rednotecdn.com",
+    "sns-v27.rednotecdn.com",
+)
+
+
+@pytest.mark.parametrize("host", REGIONAL_VIDEO_HOSTS)
+def test_regional_video_host_is_video_only(host: str) -> None:
+    raw = f"http://{host}/synthetic-motion.mp4?sig=synthetic#discard"
+    assert normalize_media_url(raw, kind="video") == (
+        f"https://{host}/synthetic-motion.mp4?sig=synthetic"
+    )
+    assert normalize_media_url(raw, kind="image") is None
+    assert normalize_media_url(raw) is None
+
+
+@pytest.mark.parametrize("host", REGIONAL_VIDEO_HOSTS)
+def test_regional_host_supports_normal_video(host: str) -> None:
+    result = normalize_note(
+        "a" * 24,
+        {
+            "type": "video",
+            "video": {"media": {"stream": {"h264": [{"masterUrl": f"http://{host}/motion.mp4"}]}}},
+        },
+    )
+    assert result.images == ()
+    assert result.videos[0].url == f"https://{host}/motion.mp4"
+
+
+@pytest.mark.parametrize("host", REGIONAL_VIDEO_HOSTS)
+@pytest.mark.parametrize("path", ["motion.m3u8", "ambiguous"])
+def test_regional_video_hosts_require_positive_mp4(host: str, path: str) -> None:
+    note = {
+        "type": "video",
+        "video": {"media": {"stream": {"h264": [{"masterUrl": f"https://{host}/{path}"}]}}},
+    }
+    with pytest.raises(AppError) as caught:
+        normalize_note("a" * 24, note)
+    assert caught.value.code == "MEDIA_NOT_FOUND"
+
+
+@pytest.mark.parametrize("host", REGIONAL_VIDEO_HOSTS)
+@pytest.mark.parametrize(
+    "authority",
+    ["{host}.evil.example", "evil{host}", "user:pass@{host}", "{host}:444"],
+)
+def test_regional_video_hosts_reject_unsafe_authorities(host: str, authority: str) -> None:
+    assert (
+        normalize_media_url(f"https://{authority.format(host=host)}/motion.mp4", kind="video")
+        is None
+    )
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://sns-v999.rednotecdn.com/motion.mp4",
+        "https://sns-v29.rednotecdn.com/motion.mp4",
+        "https://sns-v\uff12\uff18.rednotecdn.com/motion.mp4",
+        "https://sns-v28.rednotecdn.com:80/motion.mp4",
+        "http://sns-v28.rednotecdn.com:443/motion.mp4",
+        "ftp://sns-v28.rednotecdn.com/motion.mp4",
+    ],
+)
+def test_regional_video_hosts_keep_shard_and_scheme_bounds(url: str) -> None:
+    assert normalize_media_url(url, kind="video") is None
+
+
+def test_synthetic_regional_four_slot_live_photo_fixture(fixture_html) -> None:
+    state = decode_initial_state(fixture_html("synthetic_rednote_live_photo_note.html"))
+    assert state["ids"] == ["synthetic"]
+    assert state["cursor"] is None
+    selected = select_note_layout(state, "a" * 24)
+    assert selected.mobile is False
+    result = normalize_note("a" * 24, selected.payload)
+    assert result.videos == ()
+    assert [i.index for i in result.images] == [1, 2, 3, 4]
+    for index, image in enumerate(result.images, 1):
+        assert image.url == (
+            f"https://sns-web-i10.rednotecdn.com/synthetic-still-{index}.jpg?sig=synthetic"
+        )
+        assert image.live_video is not None
+        assert image.live_video.url == (
+            f"https://sns-v28.rednotecdn.com/synthetic-motion-{index}.mp4?sig=synthetic"
+        )
+        assert image.live_video.codec == "H264"
+
 
 @pytest.mark.parametrize("candidate_source", ["urlDefault", "WB_DFT"])
 def test_synthetic_rednote_web_image_is_selected_and_normalized(

@@ -120,6 +120,20 @@ Initial-state extraction balances objects/arrays while respecting double-quoted 
 
 The separately evidenced exact `sns-web-i10.rednotecdn.com` is an additional image-only host. Do not expand this into a numbered `sns-web-i` pattern or a rednotecdn suffix rule. Image URL normalization (the default context) accepts it with the existing HTTP-to-HTTPS, query, credentials, port and scheme rules. All MP4 master/backup candidates explicitly use `kind="video"`, excluding this addition for both normal videos and per-image motion. Legacy shared hosts and the existing `sns-i<ASCII digits>` namespace retain their previous behavior. Synthetic desktop tests combine Set/undefined syntax, requested-ID selection and both `urlDefault`/`WB_DFT` paths through both API routes. Host acceptance does not prove real image readability or establish the VPS Live Photo sample's actual hosts; evidence boundaries are recorded in `docs/rednote-web-image-host-fix-2026-11-06.md`.
 
+The observed regional Live Photo motion hosts `sns-v28.rednotecdn.com`,
+`sns-v11.rednotecdn.com`, and `sns-v27.rednotecdn.com` are exact **video-only**
+additions. They do not enable images, arbitrary `sns-v` shards, or suffix matching.
+Preserve positive MP4 evidence, master/backup priority, HTTPS/query normalization,
+and complete per-slot pairing. Regression coverage must combine regional still
+and regional motion hosts through both API routes, desktop acquisition and bounded
+mobile fallback; a regional page fixture using only domestic motion hosts is
+insufficient. A missing fourth motion slot must fail the entire four-image result.
+Source-network-dependent regional redirects can persist when DNS addresses are
+exchanged and sessions are fresh. Do not turn this compatibility failure into a
+global mobile switch, DNS override, generic parse retry or static-only result.
+Sanitized diagnosis and release scope are recorded in
+`docs/rednote-video-host-fix-2026-11-06.md`.
+
 ### 4. Validation & Error Matrix
 
 | Condition | HTTP / code |

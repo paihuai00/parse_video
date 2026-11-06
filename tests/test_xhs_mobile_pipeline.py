@@ -9,11 +9,110 @@ from fastapi.testclient import TestClient
 
 from app.config import Settings
 from app.main import create_app
+from app.parser.state_reader import decode_initial_state, select_note
 from app.parser.url_rules import ResolvedHop, parse_url
 
 NOTE_ID = "aaaaaaaaaaaaaaaaaaaaaaaa"
 SHORT_URL = "https://xhslink.cn/o/synthetic-token"
 DETAIL_URL = f"https://www.xiaohongshu.com/discovery/item/{NOTE_ID}?xsec_token=synthetic"
+
+
+@pytest.mark.parametrize("route", ["/api/v1/xiaohongshu/parse", "/api/v1/parse"])
+@pytest.mark.parametrize("mobile", [False, True])
+@pytest.mark.parametrize("choice", ["master", "first_backup", "second_backup"])
+def test_complete_regional_live_photo_chain(monkeypatch, fixture_html, route, mobile, choice):
+    # Synthetic region-specific still AND motion, rather than domestic motion on a regional page.
+    html = fixture_html("synthetic_rednote_live_photo_note.html")
+    note = select_note(decode_initial_state(html), NOTE_ID)
+    for item in note["imageList"]:
+        candidate = item["stream"]["h264"][0]
+        if choice != "master":
+            candidate["masterUrl"] = "https://sns-v999.rednotecdn.com/unsupported.mp4"
+        if choice == "second_backup":
+            candidate["backupUrls"][0] = "https://sns-v999.rednotecdn.com/unsupported.mp4"
+        if mobile:
+            for info in item["infoList"]:
+                info["imageScene"] = {"WB_PRV": "H5_PRV", "WB_DFT": "H5_DTL"}[info["imageScene"]]
+    if mobile:
+        note["noteId"] = NOTE_ID
+        state = {"noteData": {"hasError": False, "data": {"noteData": note}}}
+    else:
+        state = {"note": {"noteDetailMap": {NOTE_ID: {"note": note}}}}
+    html = "window.__INITIAL_STATE__=" + json.dumps(state)
+    http = mobile_pipeline(monkeypatch, "")
+    regional = DETAIL_URL.replace("www.xiaohongshu.com", "www.rednote.com")
+    PipelineSession.responses = [
+        (302, {"location": DETAIL_URL}, b""),
+        (302, {"location": regional}, b""),
+        (200, {}, b"" if mobile else html.encode()),
+    ]
+    if mobile:
+        PipelineSession.responses.append((200, {}, html.encode()))
+    with http:
+        response = http.post(
+            route,
+            headers={"X-API-Key": "test-key"},
+            json={"url": SHORT_URL, "refresh": True},
+        )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["meta"]["cache"]["hit"] is False
+    assert payload["data"]["videos"] == []
+    images = payload["data"]["images"]
+    assert len(images) == 4
+    host = {
+        "master": "sns-v28.rednotecdn.com",
+        "first_backup": "sns-v11.rednotecdn.com",
+        "second_backup": "sns-v27.rednotecdn.com",
+    }[choice]
+    for index, image in enumerate(images, 1):
+        assert image["index"] == index
+        assert image["url"] == (
+            f"https://sns-web-i10.rednotecdn.com/synthetic-still-{index}.jpg?sig=synthetic"
+        )
+        assert image["live_video"]["url"] == (
+            f"https://{host}/synthetic-motion-{index}.mp4?sig=synthetic"
+        )
+    assert PipelineSession.calls == [
+        ("chrome136", SHORT_URL),
+        ("chrome136", DETAIL_URL),
+        ("chrome136", regional),
+    ] + ([("safari184_ios", regional)] if mobile else [])
+
+
+@pytest.mark.parametrize("route", ["/api/v1/xiaohongshu/parse", "/api/v1/parse"])
+@pytest.mark.parametrize("mobile", [False, True])
+def test_incomplete_regional_last_slot_never_returns_partial_success(
+    monkeypatch, fixture_html, route, mobile
+):
+    html = fixture_html("synthetic_rednote_live_photo_note.html")
+    note = select_note(decode_initial_state(html), NOTE_ID)
+    note["imageList"][-1]["stream"] = {}
+    if mobile:
+        note["noteId"] = NOTE_ID
+        for item in note["imageList"]:
+            for info in item["infoList"]:
+                info["imageScene"] = {"WB_PRV": "H5_PRV", "WB_DFT": "H5_DTL"}[info["imageScene"]]
+        state = {"noteData": {"hasError": False, "data": {"noteData": note}}}
+    else:
+        state = {"note": {"noteDetailMap": {NOTE_ID: {"note": note}}}}
+    html = "window.__INITIAL_STATE__=" + json.dumps(state)
+    http = mobile_pipeline(monkeypatch, "")
+    PipelineSession.responses = [
+        (302, {"location": DETAIL_URL}, b""),
+        (200, {}, html.encode()),
+    ]
+    with http:
+        response = http.post(
+            route,
+            headers={"X-API-Key": "test-key"},
+            json={"url": SHORT_URL, "refresh": True},
+        )
+    payload = response.json()
+    assert response.status_code == (422 if mobile else 502)
+    assert payload["success"] is False
+    assert payload["data"] is None
+    assert payload["error"]["code"] == ("UNSUPPORTED_CONTENT" if mobile else "MEDIA_NOT_FOUND")
 
 
 class PipelineSession:

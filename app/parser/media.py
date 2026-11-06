@@ -23,6 +23,9 @@ ALLOWED_MEDIA_HOSTS = frozenset(
 )
 REGIONAL_IMAGE_HOST = re.compile(r"sns-i[0-9]+\.rednotecdn\.com", re.ASCII)
 IMAGE_ONLY_HOSTS = frozenset({"sns-web-i10.rednotecdn.com"})
+VIDEO_ONLY_HOSTS = frozenset(
+    {"sns-v28.rednotecdn.com", "sns-v11.rednotecdn.com", "sns-v27.rednotecdn.com"}
+)
 
 
 def _positive_int(value: Any) -> int | None:
@@ -57,6 +60,7 @@ def normalize_media_url(value: Any, *, kind: Literal["image", "video"] = "image"
         host not in ALLOWED_MEDIA_HOSTS
         and REGIONAL_IMAGE_HOST.fullmatch(host) is None
         and not (kind == "image" and host in IMAGE_ONLY_HOSTS)
+        and not (kind == "video" and host in VIDEO_ONLY_HOSTS)
     ):
         return None
     try:
