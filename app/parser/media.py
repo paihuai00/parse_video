@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
@@ -17,6 +18,7 @@ ALLOWED_MEDIA_HOSTS = frozenset(
         "sns-webpic-qc.xhscdn.com",
     }
 )
+REGIONAL_IMAGE_HOST = re.compile(r"sns-i[0-9]+\.rednotecdn\.com", re.ASCII)
 
 
 def _positive_int(value: Any) -> int | None:
@@ -47,7 +49,7 @@ def normalize_media_url(value: Any) -> str | None:
     except ValueError:
         return None
     host = (parts.hostname or "").lower().rstrip(".")
-    if host not in ALLOWED_MEDIA_HOSTS:
+    if host not in ALLOWED_MEDIA_HOSTS and REGIONAL_IMAGE_HOST.fullmatch(host) is None:
         return None
     try:
         port = parts.port

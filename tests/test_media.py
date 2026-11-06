@@ -7,6 +7,26 @@ from app.parser.media import normalize_media_url, normalize_mobile_note, normali
 from app.parser.state_reader import decode_initial_state, select_note
 
 
+@pytest.mark.parametrize("host", ["sns-i11.rednotecdn.com", "sns-i27.rednotecdn.com"])
+def test_regional_image_shards_preserve_full_media_url(host: str) -> None:
+    url = f"http://{host}/image.jpg?sig=synthetic"
+    assert normalize_media_url(url) == f"https://{host}/image.jpg?sig=synthetic"
+
+
+@pytest.mark.parametrize(
+    "authority",
+    [
+        "sns-i11.rednotecdn.com.evil.example",
+        "evil.rednotecdn.com",
+        "sns-i11.evilrednotecdn.com",
+        "user:pass@sns-i11.rednotecdn.com",
+        "sns-i11.rednotecdn.com:444",
+    ],
+)
+def test_regional_image_shards_reject_unsafe_authorities(authority: str) -> None:
+    assert normalize_media_url(f"https://{authority}/image.jpg") is None
+
+
 def test_image_order_and_https_upgrade(fixture_html) -> None:
     state = decode_initial_state(fixture_html("image_note.html"))
     note = normalize_note(

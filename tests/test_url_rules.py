@@ -56,6 +56,24 @@ def test_preserves_share_query_and_extracts_note_id() -> None:
     assert value.normalized_url.endswith("?xsec_token=secret&xsec_source=pc_share")
 
 
+@pytest.mark.parametrize("path", ["explore", "discovery/item"])
+def test_rednote_detail_preserves_identity_and_share_query(path: str) -> None:
+    url = f"https://www.rednote.com/{path}/6ad1f8610000000018018eef?xsec_token=synthetic"
+    parsed = parse_url(url)
+    assert parsed.note_id == "6ad1f8610000000018018eef"
+    assert parsed.normalized_url == url
+    assert not parsed.is_short_link
+
+
+@pytest.mark.parametrize(
+    "authority",
+    ["www.rednote.com.evil.example", "evil.rednote.com", "user:pass@www.rednote.com"],
+)
+def test_rednote_does_not_accept_lookalikes_or_credentials(authority: str) -> None:
+    with pytest.raises(AppError):
+        parse_url(f"https://{authority}/explore/6ad1f8610000000018018eef")
+
+
 def test_accepts_only_the_observed_mobile_short_link_shape() -> None:
     value = parse_url("https://XHSLINK.CN./o/example_Token-1")
     assert value.host == "xhslink.cn"
@@ -90,7 +108,11 @@ def test_resolve_option_contains_only_vetted_address_set() -> None:
     assert hop.resolve_entries == ["xhslink.com:443:8.8.8.8,1.1.1.1"]
 
 
-async def test_resolution_rejects_a_host_if_any_answer_is_non_public(monkeypatch) -> None:
+@pytest.mark.parametrize(
+    "url",
+    ["https://xhslink.com/a", "https://www.rednote.com/explore/6ad1f8610000000018018eef"],
+)
+async def test_resolution_rejects_a_host_if_any_answer_is_non_public(monkeypatch, url) -> None:
     async def fake_getaddrinfo(*args, **kwargs):
         _ = args, kwargs
         return [
@@ -101,5 +123,5 @@ async def test_resolution_rejects_a_host_if_any_answer_is_non_public(monkeypatch
     loop = asyncio.get_running_loop()
     monkeypatch.setattr(loop, "getaddrinfo", fake_getaddrinfo)
     with pytest.raises(AppError) as caught:
-        await resolve_url("https://xhslink.com/a")
+        await resolve_url(url)
     assert caught.value.code == "INVALID_URL"

@@ -22,9 +22,10 @@ MOBILE_IMPERSONATE = "safari184_ios"
 
 
 class _NoteStatusRedirect(AppError):
-    def __init__(self, note_id: str) -> None:
+    def __init__(self, note_id: str, retry_url: str | None = None) -> None:
         super().__init__("UPSTREAM_BAD_RESPONSE", 502, detail="upstream note status redirect")
         self.note_id = note_id
+        self.retry_url = retry_url
 
 
 @dataclass
@@ -103,6 +104,11 @@ class XiaohongshuClient:
                 if impersonate != MOBILE_IMPERSONATE and budget.attempts:
                     impersonate = MOBILE_IMPERSONATE
                     expected_note_id = parse_url(raw_url).note_id or exc.note_id
+                    # The regional route already consumed the shared redirect
+                    # budget. Retry its validated full detail URL, preserving
+                    # access parameters and binding the mobile note identity.
+                    if exc.retry_url is not None:
+                        raw_url = exc.retry_url
                     continue
                 raise
             except AppError as exc:
@@ -147,6 +153,8 @@ class XiaohongshuClient:
                         502,
                         detail="mobile redirect changed requested note",
                     )
+                if hop.note_id is not None:
+                    expected_note_id = hop.note_id
                 # This option is session-scoped in curl_cffi 0.13.0. Requests in a
                 # parse are sequential, so replacing it before each hop pins that
                 # connection while preserving the session's anonymous cookie jar.
@@ -209,7 +217,8 @@ class XiaohongshuClient:
                     status_target = note_status_redirect(hop, current_url)
                     if status_target == "error":
                         assert hop.note_id is not None
-                        raise _NoteStatusRedirect(hop.note_id)
+                        retry_url = hop.normalized_url if hop.host == "www.rednote.com" else None
+                        raise _NoteStatusRedirect(hop.note_id, retry_url)
                     if status_target == "login":
                         raise AppError(
                             "UPSTREAM_LOGIN_REQUIRED", 503, detail="upstream login redirect"

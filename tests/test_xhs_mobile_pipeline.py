@@ -115,3 +115,40 @@ def test_mobile_pipeline_rejects_partial_images_instead_of_returning_success(mon
     assert result.json()["data"] is None
     assert result.json()["error"]["code"] == "MEDIA_NOT_FOUND"
     assert result.json()["meta"]["cache"] is None
+
+
+@pytest.mark.parametrize("route", ["/api/v1/xiaohongshu/parse", "/api/v1/parse"])
+def test_regional_redirect_and_mobile_fallback_fit_original_budget(
+    monkeypatch, fixture_html, route
+) -> None:
+    html = fixture_html("mobile_image_note.html").replace(
+        "sns-webpic-qc.xhscdn.com", "sns-i27.rednotecdn.com"
+    )
+    http = mobile_pipeline(monkeypatch, html)
+    regional_url = DETAIL_URL.replace("www.xiaohongshu.com", "www.rednote.com")
+    PipelineSession.responses = [
+        (302, {"location": DETAIL_URL}, b""),
+        (302, {"location": regional_url}, b""),
+        (302, {"location": "/404?errorCode=synthetic"}, b""),
+        (200, {}, html.encode()),
+    ]
+    with http:
+        response = http.post(
+            route,
+            headers={"X-API-Key": "test-key"},
+            json={"url": SHORT_URL, "refresh": True},
+        )
+        assert response.status_code == 200
+        data = response.json()["data"]
+        assert data["note_id"] == NOTE_ID
+        assert len(data["images"]) == 2
+        assert data["videos"] == []
+        assert data["images"][0]["url"] == (
+            "https://sns-i27.rednotecdn.com/detail-one.jpg?sig=synthetic"
+        )
+    assert PipelineSession.calls == [
+        ("chrome136", SHORT_URL),
+        ("chrome136", DETAIL_URL),
+        ("chrome136", regional_url),
+        ("safari184_ios", regional_url),
+    ]

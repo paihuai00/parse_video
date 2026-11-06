@@ -357,6 +357,43 @@ async def test_short_link_cannot_directly_trigger_status_fallback(monkeypatch) -
     assert len(RedirectSession.instances) == 1
 
 
+async def test_regional_redirect_cannot_change_note_identity(monkeypatch) -> None:
+    other_id = "bbbbbbbbbbbbbbbbbbbbbbbb"
+    target = f"https://www.rednote.com/explore/{other_id}"
+    resolved = install_redirect_scenario(monkeypatch, [(302, {"location": target}, b"")])
+    with pytest.raises(AppError) as caught:
+        await XiaohongshuClient(Settings(api_key="x", environment="test")).fetch(
+            DETAIL_URL, Deadline(1)
+        )
+    assert caught.value.code == "UPSTREAM_BAD_RESPONSE"
+    assert resolved == [DETAIL_URL, target]
+    assert len(RedirectSession.instances[0].calls) == 1
+
+
+async def test_regional_mobile_fallback_cannot_reset_redirect_budget(monkeypatch) -> None:
+    regional_url = DETAIL_URL.replace("www.xiaohongshu.com", "www.rednote.com")
+    resolved = install_redirect_scenario(
+        monkeypatch,
+        [
+            (302, {"location": DETAIL_URL}, b""),
+            (302, {"location": regional_url}, b""),
+            (302, {"location": "/404"}, b""),
+            (302, {"location": regional_url}, b""),
+        ],
+    )
+    with pytest.raises(AppError) as caught:
+        await XiaohongshuClient(Settings(api_key="x", environment="test")).fetch(
+            SHORT_URL, Deadline(1)
+        )
+    assert caught.value.code == "UPSTREAM_BAD_RESPONSE"
+    assert caught.value.detail == "redirect limit exceeded"
+    assert resolved == [SHORT_URL, DETAIL_URL, regional_url, regional_url]
+    assert [s.kwargs["impersonate"] for s in RedirectSession.instances] == [
+        "chrome136",
+        "safari184_ios",
+    ]
+
+
 async def test_fallback_cannot_reset_redirect_budget(monkeypatch) -> None:
     resolved = install_redirect_scenario(
         monkeypatch,

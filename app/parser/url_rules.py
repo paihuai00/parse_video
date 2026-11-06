@@ -13,7 +13,7 @@ from urllib.parse import SplitResult, urlsplit, urlunsplit
 from app.errors import AppError, invalid_url
 
 SHORT_LINK_HOSTS = frozenset({"xhslink.com", "xhslink.cn"})
-DETAIL_HOSTS = frozenset({"www.xiaohongshu.com", "xiaohongshu.com"})
+DETAIL_HOSTS = frozenset({"www.xiaohongshu.com", "xiaohongshu.com", "www.rednote.com"})
 ALLOWED_HOSTS = DETAIL_HOSTS | SHORT_LINK_HOSTS
 NOTE_ID_LENGTH = 24
 SHORT_TOKEN_CHARS = frozenset("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_")
