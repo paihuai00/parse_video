@@ -124,7 +124,7 @@ def _mobile_image_url(item: dict[str, Any]) -> str | None:
 
 
 def normalize_mobile_note(note_id: str, note: dict[str, Any]) -> InternalNote:
-    """Normalize only positively complete mobile static-image notes."""
+    """Normalize complete mobile images, retaining supported paired motion."""
     if note.get("type") != "normal" or note.get("video") is not None:
         raise AppError("UNSUPPORTED_CONTENT", 422, detail="mobile note type is unsupported")
     images = note.get("imageList")
@@ -139,8 +139,13 @@ def normalize_mobile_note(note_id: str, note: dict[str, Any]) -> InternalNote:
         stream = item.get("stream", {})
         if not isinstance(stream, dict):
             raise AppError("MEDIA_NOT_FOUND", 502, detail="mobile image stream is malformed")
+        live_video = None
         if _is_live_photo(item) or stream:
-            raise AppError("UNSUPPORTED_CONTENT", 422, detail="mobile motion image is unsupported")
+            live_video = _selected_video(stream)
+            if live_video is None:
+                raise AppError(
+                    "UNSUPPORTED_CONTENT", 422, detail="mobile motion has no supported MP4"
+                )
         url = _mobile_image_url(item)
         if url is None:
             raise AppError("MEDIA_NOT_FOUND", 502, detail="mobile detail image is missing")
@@ -150,6 +155,7 @@ def normalize_mobile_note(note_id: str, note: dict[str, Any]) -> InternalNote:
                 _positive_int(item.get("width")),
                 _positive_int(item.get("height")),
                 len(normalized) + 1,
+                live_video,
             )
         )
     title = _text(note.get("title")) or _text(note.get("desc"))

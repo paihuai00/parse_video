@@ -57,6 +57,146 @@ def mobile_pipeline(monkeypatch, html):
 
 @pytest.mark.parametrize("route", ["/api/v1/xiaohongshu/parse", "/api/v1/parse"])
 @pytest.mark.parametrize(
+    ("fixture_name", "image_count", "motion_count"),
+    [("mobile_image_note.html", 2, 0), ("synthetic_mobile_live_photo_note.html", 1, 1)],
+)
+def test_empty_desktop_detail_retries_once_and_returns_complete_mobile_media(
+    monkeypatch, fixture_html, route, fixture_name, image_count, motion_count
+) -> None:
+    http = mobile_pipeline(monkeypatch, "")
+    PipelineSession.responses = [
+        (302, {"location": DETAIL_URL}, b""),
+        (200, {"content-type": "text/plain", "content-length": "0"}, b""),
+        (200, {}, fixture_html(fixture_name).encode()),
+    ]
+    with http:
+        response = http.post(
+            route,
+            headers={"X-API-Key": "test-key"},
+            json={"url": SHORT_URL, "refresh": True},
+        )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["error"] is None
+    assert payload["meta"]["cache"]["hit"] is False
+    assert payload["data"]["videos"] == []
+    images = payload["data"]["images"]
+    assert len(images) == image_count
+    assert sum("live_video" in image for image in images) == motion_count
+    assert PipelineSession.calls == [
+        ("chrome136", SHORT_URL),
+        ("chrome136", DETAIL_URL),
+        ("safari184_ios", DETAIL_URL),
+    ]
+
+
+def test_two_empty_details_return_upstream_error_without_partial_result(monkeypatch) -> None:
+    http = mobile_pipeline(monkeypatch, "")
+    PipelineSession.responses = [
+        (302, {"location": DETAIL_URL}, b""),
+        (200, {"content-type": "text/plain"}, b""),
+        (200, {"content-type": "text/plain"}, b""),
+    ]
+    with http:
+        response = http.post(
+            "/api/v1/xiaohongshu/parse",
+            headers={"X-API-Key": "test-key"},
+            json={"url": SHORT_URL, "refresh": True},
+        )
+    payload = response.json()
+    assert response.status_code == 502
+    assert payload["error"]["code"] == "UPSTREAM_BAD_RESPONSE"
+    assert payload["error"]["retryable"] is True
+    assert payload["data"] is None
+    assert payload["meta"]["cache"] is None
+    assert len(PipelineSession.calls) == 3
+
+
+@pytest.mark.parametrize("route", ["/api/v1/xiaohongshu/parse", "/api/v1/parse"])
+@pytest.mark.parametrize("live_photo", [False, True])
+def test_synthetic_regional_desktop_set_state_needs_no_mobile_fallback(
+    monkeypatch, fixture_html, route, live_photo
+) -> None:
+    # Synthetic fixture models reported syntax, not the VPS page's exact content/layout.
+    html = fixture_html("synthetic_rednote_set_note.html")
+    if live_photo:
+        html = html.replace(
+            '"livePhoto":false',
+            '"livePhoto":true,"stream":{"h264":[{'
+            '"masterUrl":"http://sns-video-v4.xhscdn.com/synthetic-motion.mp4?sig=synthetic",'
+            '"backupUrls":["https://sns-bak-v1.xhscdn.com/synthetic-motion.mp4?sig=synthetic"]'
+            "}]}",
+        )
+    http = mobile_pipeline(monkeypatch, "")
+    regional_url = DETAIL_URL.replace("www.xiaohongshu.com", "www.rednote.com")
+    PipelineSession.responses = [
+        (302, {"location": DETAIL_URL}, b""),
+        (302, {"location": regional_url}, b""),
+        (200, {}, html.encode()),
+    ]
+    with http:
+        response = http.post(
+            route,
+            headers={"X-API-Key": "test-key"},
+            json={"url": SHORT_URL, "refresh": True},
+        )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["error"] is None
+    assert payload["meta"]["cache"]["hit"] is False
+    assert payload["data"]["videos"] == []
+    images = payload["data"]["images"]
+    assert len(images) == 1
+    if live_photo:
+        assert images[0]["live_video"]["url"] == (
+            "https://sns-video-v4.xhscdn.com/synthetic-motion.mp4?sig=synthetic"
+        )
+    else:
+        assert "live_video" not in images[0]
+    assert PipelineSession.calls == [
+        ("chrome136", SHORT_URL),
+        ("chrome136", DETAIL_URL),
+        ("chrome136", regional_url),
+    ]
+
+
+@pytest.mark.parametrize("route", ["/api/v1/xiaohongshu/parse", "/api/v1/parse"])
+@pytest.mark.parametrize("expression", ["new Map([])", "new Set([1]).size", "new Set([1]"])
+def test_synthetic_regional_unsupported_syntax_fails_without_fallback_or_partial_media(
+    monkeypatch, fixture_html, route, expression
+) -> None:
+    html = fixture_html("synthetic_rednote_set_note.html").replace(
+        'new Set(["synthetic-comment-one","synthetic-comment-two"])', expression
+    )
+    http = mobile_pipeline(monkeypatch, "")
+    regional_url = DETAIL_URL.replace("www.xiaohongshu.com", "www.rednote.com")
+    PipelineSession.responses = [
+        (302, {"location": DETAIL_URL}, b""),
+        (302, {"location": regional_url}, b""),
+        (200, {}, html.encode()),
+    ]
+    with http:
+        response = http.post(
+            route,
+            headers={"X-API-Key": "test-key"},
+            json={"url": SHORT_URL, "refresh": True},
+        )
+    assert response.status_code == 502
+    payload = response.json()
+    assert payload["success"] is False
+    assert payload["data"] is None
+    assert payload["meta"]["cache"] is None
+    assert payload["error"]["code"] == "PARSE_FAILED"
+    assert expression not in response.text
+    assert PipelineSession.calls == [
+        ("chrome136", SHORT_URL),
+        ("chrome136", DETAIL_URL),
+        ("chrome136", regional_url),
+    ]
+
+
+@pytest.mark.parametrize("route", ["/api/v1/xiaohongshu/parse", "/api/v1/parse"])
+@pytest.mark.parametrize(
     ("master_host", "backup_hosts", "expected_host"),
     [
         (

@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 4
+- **Total Sessions**: 6
 - **Last Active**: 2026-11-06
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~108 | Active |
+| `journal-1.md` | ~146 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,8 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 6 | 2026-11-06 | Recover bounded empty detail responses with complete mobile motion | - | `main` |
+| 5 | 2026-11-06 | Handle bounded rednote Set state serialization | - | `main` |
 | 4 | 2026-11-06 | Fix exact Live Photo CDN host compatibility | - | `main` |
 | 3 | 2026-11-05 | 小红书匿名移动页修复完成与部署移交 | - | `main` |
 | 2 | 2026-11-04 | 小红书 INVALID_URL 跳转诊断 | - | `main` |

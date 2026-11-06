@@ -20,3 +20,13 @@ Parser and service modules raise domain errors and do not construct HTTP respons
 ## Xiaohongshu Status Redirects
 
 Validate the status destination's authority using the same URL primitives before classifying a redirect from an already validated note. Exact same-origin `/login` is an upstream login outcome; exact `/404` is a conservative upstream status, not proof that a note is missing. A narrow internal typed status error permits the bounded anonymous mobile strategy while preserving the public envelope. Do not trigger fallback by matching arbitrary diagnostic strings or broad public `INVALID_URL`/`PARSE_FAILED` codes. Invalid authority, arbitrary paths or unsafe DNS remain rejected and must not be retried by another strategy.
+
+An independently observed HTTP 200 with exactly zero body bytes on a validated
+detail is a typed acquisition failure, not malformed JSON. It may consume the
+same single mobile fallback using the full validated detail URL and bound note
+identity. Both strategies share the original two attempts, deadline and redirect
+budget. A mobile/repeated empty detail is retryable `UPSTREAM_BAD_RESPONSE`.
+Nonempty missing-state/invalid-JSON pages remain `PARSE_FAILED` without fallback;
+short-link emptiness cannot select another strategy. Mobile image motion is only
+returned when both a legal detail still and a positively identified paired MP4
+exist; incomplete or unsupported motion cannot become static-only success.

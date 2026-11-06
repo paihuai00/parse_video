@@ -48,6 +48,7 @@ class ParseService:
 class XiaohongshuClient:
     async def fetch(self, raw_url: str, deadline: Deadline) -> PageResponse: ...
 
+def decode_initial_state(html: str) -> dict[str, Any]: ...
 def select_note_layout(state: dict[str, Any], note_id: str) -> SelectedNote: ...
 def normalize_mobile_note(note_id: str, note: dict[str, Any]) -> InternalNote: ...
 
@@ -82,8 +83,8 @@ Success response invariants:
 - The legacy route accepts only Xiaohongshu and retains the 24-hex `note_id` schema and public messages. The unified route auto-detects the platform and accepts either a 24-hex Xiaohongshu ID or an 18-20 digit Douyin ID; both routes build fresh caller metadata from the same internal result.
 - A Douyin static image work preserves every upstream image slot in order, assigns one-based indexes, returns `videos=[]` and `cover=null`, and rejects a missing slot or motion-bearing slot instead of returning a partial result.
 - A Douyin normal video returns one positively identified MP4 and an optional independent cover. Candidate URL, dimensions, codec, quality, duration, and size come from one selected variant; an exact, independently evidenced CDN host is required.
-- A Xiaohongshu mobile static note requires exact `noteData.data.noteData` with outer `hasError is False` and matching `noteId`. `SelectedNote(payload, mobile)` keeps the source layout through adapter normalization; the compatibility `select_note()` still returns the payload. Malformed desktop state cannot be rescued by unrelated shadow mobile data.
-- Mobile normalization accepts only positively complete `type="normal"` static images: every slot must have a legal detail candidate, in original order. Prefer `H5_DTL`, then a direct image URL that is not a known `H5_PRV` preview. Reject malformed or missing slots and preview-only results instead of returning a partial list. Motion evidence, nonempty stream dictionaries or mobile video cannot silently become a static-image success. Desktop video/Live Photo behavior is unchanged.
+- A Xiaohongshu mobile image note requires exact `noteData.data.noteData` with outer `hasError is False` and matching `noteId`. `SelectedNote(payload, mobile)` keeps the source layout through adapter normalization; the compatibility `select_note()` still returns the payload. Malformed desktop state cannot be rescued by unrelated shadow mobile data.
+- Mobile normalization accepts only positively complete `type="normal"` image slots in original order. Prefer `H5_DTL`, then a direct image URL that is not a known `H5_PRV` preview. Reject missing/malformed slots and preview-only results instead of returning a partial list. A motion-bearing slot must additionally supply a supported MP4 selected with the shared desktop master/backup and metadata rules; attach it as that image's `live_video`, never as a top-level video or a static-only success. Motion without a supported pair remains `UNSUPPORTED_CONTENT`. Mobile normal video remains unsupported; desktop behavior is unchanged.
 
 Environment keys:
 
@@ -104,7 +105,7 @@ Environment keys:
 | `XHS_DOUYIN_STATE_MAX_BYTES` | `2097152` cumulative detail/Flight state |
 | `XHS_DOUYIN_BROWSER_CHANNEL` | Optional Playwright channel override; container uses bundled `chromium` |
 
-Upstream connections use `curl_cffi==0.13.0`, desktop `chrome136` by default, `trust_env=False`, manual redirects, TLS verification, and independent anonymous sessions per strategy. Only a validated note response redirecting to exact same-origin `/404` is eligible for one `safari184_ios` fallback on the original full input URL. The internal typed status error remains public `UPSTREAM_BAD_RESPONSE` if no fallback remains; neither `/404` nor unknown `errorCode` proves deletion. Exact same-origin `/login` maps to `UPSTREAM_LOGIN_REQUIRED` without fetching it. Caller URL parsing remains strict and does not accept either status path.
+Upstream connections use `curl_cffi==0.13.0`, desktop `chrome136` by default, `trust_env=False`, manual redirects, TLS verification, and independent anonymous sessions per strategy. A validated note response redirecting to exact same-origin `/404` is eligible for one `safari184_ios` fallback on the original full input URL (except the regional URL rule below). A separate typed outcome permits the same bounded fallback when a checked detail returns HTTP 200 with exactly zero body bytes: retry that full validated detail URL, rechecking DNS and binding the established note ID. Do not infer emptiness from Content-Length alone, apply this rule to short-link responses, or treat a nonempty unparseable page as empty. Repeated mobile emptiness is retryable `UPSTREAM_BAD_RESPONSE`, never `PARSE_FAILED` or an empty success. The internal status error remains public `UPSTREAM_BAD_RESPONSE` if no fallback remains; neither `/404` nor unknown `errorCode` proves deletion. Exact same-origin `/login` maps to `UPSTREAM_LOGIN_REQUIRED` without fetching it. Caller URL parsing remains strict and does not accept either status path.
 
 All desktop retries and mobile fallback share two total attempts, the original `Deadline`, admission state and the parse-wide configured redirect limit (default three). The mobile strategy binds to the note ID established by the original long URL or desktop-resolved short link; a mobile redirect cannot substitute another note. Arbitrary paths, credentials, changed status origin, unsafe DNS/redirects, explicit login/challenge/throttle, timeout and generic parse errors do not trigger fallback. Before every connection, validate all resolved addresses as public unicast and replace session-level `CurlOpt.RESOLVE` with the vetted host/port/address set. Do not broaden URL or media hosts to make fallback succeed.
 
@@ -113,6 +114,8 @@ The observed regional detail host `www.rednote.com` is explicitly supported with
 Douyin acquisition starts a fresh Chromium process and anonymous context for one parse. Chromium uses only a loopback CONNECT proxy; the proxy accepts exact allowlisted HTTPS hosts, resolves them with a shared bounded timeout, rejects any non-public answer, and connects to the vetted IP so Chromium cannot re-resolve externally. Page routing allows only required document/script/XHR/fetch types, caps requests and tunnel bytes, blocks service workers, and uses the original 20-second `Deadline`. Detail responses are keyed by work ID so unrelated recommendations cannot win a race. React Flight scripts are read incrementally with a cumulative browser-side byte cap, including scripts appended after initial DOM load. Cancellation, timeout, browser failure, or proxy shutdown must close and await contexts, processes, tunnels, and handler tasks.
 
 Host allowlisting is exact, never suffix-based. ASCII host case and at most one terminal DNS root dot are canonicalized; repeated trailing dots are rejected. `xhslink.cn` is accepted only for `/o/<token>` where the token is one non-empty ASCII URL-safe segment (`A-Z`, `a-z`, `0-9`, `-`, `_`). Its subdomains, lookalikes, encoded slashes or backslashes, dot traversal, extra path segments, Unicode tokens, overlong URLs, and other paths fail before connection. A short-link redirect receives the same host/path, DNS, address, port, TLS, and redirect-budget checks as the initial URL.
+
+Initial-state extraction balances objects/arrays while respecting double-quoted strings and escapes. Its original source span is at most 2 Mi characters (inclusive), with at most 80 nested containers. Before JSON decoding, a string-aware value scanner converts only value-token `undefined` to null and exact `new Set(array)` to an array, requiring one literal array argument and the closing parenthesis. Constructor tokens permit ASCII JSON whitespace. Preserve array order, values and duplicates: this is data normalization, not execution or Set semantics. Do not change quoted keys/values, support arbitrary constructors/expressions, or globally replace text. Nested supported Set arrays consume the same container-depth budget; decoded values still obey the 200,000-node cap. Unsupported/malformed serialization remains `PARSE_FAILED` without mobile fallback. See the explicitly synthetic fixtures and VPS verification in `docs/rednote-set-state-fix-2026-11-06.md`.
 
 ### 4. Validation & Error Matrix
 
@@ -125,9 +128,10 @@ Host allowlisting is exact, never suffix-based. ASCII host case and at most one 
 | Unknown route / wrong method | `404 ROUTE_NOT_FOUND` / `405 METHOD_NOT_ALLOWED` |
 | Body over the HTTP input limit | `413 INPUT_TOO_LARGE` |
 | Live broadcast, unsupported work type, unrelated mixed media, or Douyin motion image | `422 UNSUPPORTED_CONTENT` |
-| Mobile Xiaohongshu video or motion-bearing image | `422 UNSUPPORTED_CONTENT`; never return a still-only result |
+| Mobile Xiaohongshu video or motion without a supported paired MP4 | `422 UNSUPPORTED_CONTENT`; never return a still-only result |
 | Mobile missing/malformed image slot or no supported detail image | `502 MEDIA_NOT_FOUND`; never skip the slot |
-| Declared/equivalent Live Photo missing a valid still or supported MP4 | `502 MEDIA_NOT_FOUND`; never return partial static-only success |
+| Desktop declared/equivalent Live Photo missing a valid still or supported MP4 | `502 MEDIA_NOT_FOUND`; never return partial static-only success |
+| Validated detail returns 200 with zero body bytes | One typed mobile fallback within shared budgets; exhausted/mobile emptiness → retryable `502 UPSTREAM_BAD_RESPONSE` |
 | Per-key request window exceeded | `429 RATE_LIMITED` with `Retry-After` |
 | Queue full or wait expired | `503 BUSY` with `Retry-After` |
 | Login/challenge/upstream throttle | `503 UPSTREAM_LOGIN_REQUIRED`, `UPSTREAM_ACCESS_RESTRICTED`, or `UPSTREAM_RATE_LIMITED` |
@@ -190,7 +194,7 @@ Correct: keep image-note `videos=[]`, preserve the ordered still, and attach the
 
 Wrong: pass a mobile payload through desktop normalization or catch every `INVALID_URL`/`PARSE_FAILED` to try another client. This can skip image slots, use previews, retry unsafe destinations or hide unrelated failures.
 
-Correct: retain exact layout and normalize through its validated branch; only the typed safe note-status redirect can select the mobile strategy.
+Correct: retain exact layout and normalize through its validated branch; only typed safe note-status redirects and checked 200 zero-byte detail responses can select the mobile strategy. Generic parse errors never select it.
 
 ```python
 selected = select_note_layout(state, page.note_id)

@@ -28,6 +28,13 @@ class _NoteStatusRedirect(AppError):
         self.retry_url = retry_url
 
 
+class _EmptyNoteResponse(AppError):
+    def __init__(self, note_id: str, retry_url: str) -> None:
+        super().__init__("UPSTREAM_BAD_RESPONSE", 502, True, "empty upstream note response")
+        self.note_id = note_id
+        self.retry_url = retry_url
+
+
 @dataclass
 class _FetchBudget:
     attempts: int = 2
@@ -100,13 +107,12 @@ class XiaohongshuClient:
                 return await self._fetch_once(
                     raw_url, deadline, budget, impersonate, expected_note_id
                 )
-            except _NoteStatusRedirect as exc:
+            except (_NoteStatusRedirect, _EmptyNoteResponse) as exc:
                 if impersonate != MOBILE_IMPERSONATE and budget.attempts:
                     impersonate = MOBILE_IMPERSONATE
                     expected_note_id = parse_url(raw_url).note_id or exc.note_id
-                    # The regional route already consumed the shared redirect
-                    # budget. Retry its validated full detail URL, preserving
-                    # access parameters and binding the mobile note identity.
+                    # Regional status/empty-detail retries reuse the validated
+                    # full URL, preserving query, identity and redirect budget.
                     if exc.retry_url is not None:
                         raw_url = exc.retry_url
                     continue
@@ -240,4 +246,6 @@ class XiaohongshuClient:
                     raise AppError(
                         "UPSTREAM_BAD_RESPONSE", 502, detail="short link did not resolve to a note"
                     )
+                if response.status_code == 200 and not body:
+                    raise _EmptyNoteResponse(hop.note_id, hop.normalized_url)
                 return PageResponse(html, hop.normalized_url, hop.note_id)

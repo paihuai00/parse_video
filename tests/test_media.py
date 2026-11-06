@@ -328,7 +328,6 @@ def test_mobile_never_skips_an_invalid_image_slot(fixture_html, bad_slot) -> Non
     "motion",
     [
         {"livePhoto": True},
-        {"stream": {"h264": [{"masterUrl": "https://sns-video-v6.xhscdn.com/a.mp4"}]}},
         {"stream": {"unknown": []}},
         {"videoUrl": "https://sns-video-v6.xhscdn.com/a.mp4"},
         {"livePhotoUrl": "https://sns-video-v6.xhscdn.com/a.mp4"},
@@ -340,6 +339,59 @@ def test_mobile_motion_cannot_be_returned_as_static_image(fixture_html, motion) 
     with pytest.raises(AppError) as caught:
         normalize_mobile_note("aaaaaaaaaaaaaaaaaaaaaaaa", payload)
     assert caught.value.code == "UNSUPPORTED_CONTENT"
+
+
+@pytest.mark.parametrize("explicit_marker", [False, True])
+def test_mobile_complete_live_photo_preserves_detail_image_motion_and_metadata(
+    fixture_html, explicit_marker
+) -> None:
+    note = select_note(
+        decode_initial_state(fixture_html("synthetic_mobile_live_photo_note.html")),
+        "aaaaaaaaaaaaaaaaaaaaaaaa",
+    )
+    note["imageList"][0]["livePhoto"] = explicit_marker
+    result = normalize_mobile_note("aaaaaaaaaaaaaaaaaaaaaaaa", note)
+    assert result.videos == ()
+    assert len(result.images) == 1
+    image = result.images[0]
+    assert image.url == "https://sns-webpic-qc.xhscdn.com/synthetic-detail.jpg"
+    assert image.index == 1
+    assert image.source_width == 1400
+    assert image.live_video is not None
+    assert image.live_video.url == (
+        "https://sns-video-v4.xhscdn.com/synthetic-motion.mp4?sig=synthetic"
+    )
+    assert image.live_video.source_width is None
+    assert image.live_video.source_height is None
+    assert image.live_video.duration_seconds == 2.4
+    assert image.live_video.size_bytes == 34567
+
+
+@pytest.mark.parametrize(
+    "motion_url",
+    [
+        "https://evil.example/motion.mp4",
+        "https://sns-video-v4.xhscdn.com/ambiguous",
+        "https://sns-video-v4.xhscdn.com/motion.m3u8",
+    ],
+)
+def test_mobile_unusable_motion_never_returns_partial_images(fixture_html, motion_url) -> None:
+    note = mobile_note(fixture_html)
+    note["imageList"][1].update(livePhoto=True, stream={"h264": [{"masterUrl": motion_url}]})
+    with pytest.raises(AppError) as caught:
+        normalize_mobile_note("aaaaaaaaaaaaaaaaaaaaaaaa", note)
+    assert caught.value.code == "UNSUPPORTED_CONTENT"
+
+
+def test_mobile_live_photo_still_requires_complete_detail_image(fixture_html) -> None:
+    note = select_note(
+        decode_initial_state(fixture_html("synthetic_mobile_live_photo_note.html")),
+        "aaaaaaaaaaaaaaaaaaaaaaaa",
+    )
+    note["imageList"][0]["infoList"] = note["imageList"][0]["infoList"][:1]
+    with pytest.raises(AppError) as caught:
+        normalize_mobile_note("aaaaaaaaaaaaaaaaaaaaaaaa", note)
+    assert caught.value.code == "MEDIA_NOT_FOUND"
 
 
 @pytest.mark.parametrize("images", [None, [], "invalid"])

@@ -275,6 +275,99 @@ def install_redirect_scenario(monkeypatch, responses):
     return resolved
 
 
+@pytest.mark.parametrize("host", ["www.xiaohongshu.com", "www.rednote.com"])
+async def test_empty_checked_detail_retries_same_url_with_mobile_and_pinned_dns(
+    monkeypatch, fixture_html, host
+) -> None:
+    detail_url = DETAIL_URL.replace("www.xiaohongshu.com", host)
+    resolved = install_redirect_scenario(
+        monkeypatch,
+        [
+            (200, {"content-type": "text/plain", "content-length": "0"}, b""),
+            (200, {}, fixture_html("mobile_image_note.html").encode()),
+        ],
+    )
+    result = await XiaohongshuClient(Settings(api_key="x", environment="test")).fetch(
+        detail_url, Deadline(1)
+    )
+    assert result.note_id == NOTE_ID
+    assert result.final_url == detail_url
+    assert resolved == [detail_url, detail_url]
+    assert [s.kwargs["impersonate"] for s in RedirectSession.instances] == [
+        "chrome136",
+        "safari184_ios",
+    ]
+    for session in RedirectSession.instances:
+        assert session.kwargs["trust_env"] is False
+        assert session.resolve_history == [[f"{host}:443:8.8.8.8"]]
+        options = session.calls[0][1]
+        assert options["allow_redirects"] is False
+        assert options["verify"] is True
+        assert options["timeout"][1] <= 1
+
+
+@pytest.mark.parametrize("profile", ["chrome136", "safari184_ios"])
+async def test_empty_mobile_response_never_adds_another_attempt(monkeypatch, profile) -> None:
+    install_redirect_scenario(monkeypatch, [(200, {}, b"")] * 2)
+    with pytest.raises(AppError) as caught:
+        await XiaohongshuClient(
+            Settings(api_key="x", environment="test", impersonate=profile)
+        ).fetch(DETAIL_URL, Deadline(1))
+    assert caught.value.code == "UPSTREAM_BAD_RESPONSE"
+    assert caught.value.detail == "empty upstream note response"
+    assert caught.value.retryable is True
+    assert len(RedirectSession.instances) == (2 if profile == "chrome136" else 1)
+
+
+async def test_empty_detail_cannot_create_a_third_attempt_after_desktop_retry(monkeypatch) -> None:
+    install_redirect_scenario(monkeypatch, [(500, {}, b""), (200, {}, b"")])
+    with pytest.raises(AppError) as caught:
+        await XiaohongshuClient(Settings(api_key="x", environment="test")).fetch(
+            DETAIL_URL, Deadline(1)
+        )
+    assert caught.value.code == "UPSTREAM_BAD_RESPONSE"
+    assert [s.kwargs["impersonate"] for s in RedirectSession.instances] == ["chrome136"] * 2
+
+
+async def test_empty_short_link_cannot_trigger_mobile_fallback(monkeypatch) -> None:
+    install_redirect_scenario(monkeypatch, [(200, {}, b"")])
+    with pytest.raises(AppError) as caught:
+        await XiaohongshuClient(Settings(api_key="x", environment="test")).fetch(
+            SHORT_URL, Deadline(1)
+        )
+    assert caught.value.code == "UPSTREAM_BAD_RESPONSE"
+    assert len(RedirectSession.instances) == 1
+
+
+@pytest.mark.parametrize("body", [b" ", b"<html>no state</html>"])
+async def test_nonempty_unparseable_page_never_triggers_empty_response_fallback(
+    monkeypatch, body
+) -> None:
+    install_redirect_scenario(monkeypatch, [(200, {"content-type": "text/plain"}, body)])
+    result = await XiaohongshuClient(Settings(api_key="x", environment="test")).fetch(
+        DETAIL_URL, Deadline(1)
+    )
+    assert result.html == body.decode()
+    assert len(RedirectSession.instances) == 1
+
+
+async def test_empty_response_fallback_still_obeys_shared_redirect_budget(monkeypatch) -> None:
+    resolved = install_redirect_scenario(
+        monkeypatch,
+        [
+            (302, {"location": DETAIL_URL}, b""),
+            (200, {}, b""),
+            (302, {"location": DETAIL_URL}, b""),
+        ],
+    )
+    with pytest.raises(AppError) as caught:
+        await XiaohongshuClient(Settings(api_key="x", environment="test", max_redirects=1)).fetch(
+            SHORT_URL, Deadline(1)
+        )
+    assert caught.value.detail == "redirect limit exceeded"
+    assert resolved == [SHORT_URL, DETAIL_URL, DETAIL_URL]
+
+
 async def test_safe_status_redirect_falls_back_once_with_original_query_and_session(
     monkeypatch, fixture_html
 ) -> None:
@@ -438,8 +531,9 @@ async def test_fallback_cannot_retry_its_temporary_error(monkeypatch) -> None:
     assert len(RedirectSession.instances) == 2
 
 
-async def test_fallback_cannot_reset_total_deadline(monkeypatch) -> None:
-    install_redirect_scenario(monkeypatch, [(302, {"location": "/404"}, b"")])
+@pytest.mark.parametrize("trigger", [(302, {"location": "/404"}, b""), (200, {}, b"")])
+async def test_fallback_cannot_reset_total_deadline(monkeypatch, trigger) -> None:
+    install_redirect_scenario(monkeypatch, [trigger])
     calls = 0
 
     async def resolver(url):
@@ -460,8 +554,9 @@ async def test_fallback_cannot_reset_total_deadline(monkeypatch) -> None:
     assert RedirectSession.instances[1].calls == []
 
 
-async def test_private_dns_after_fallback_is_not_retried(monkeypatch) -> None:
-    install_redirect_scenario(monkeypatch, [(302, {"location": "/404"}, b"")])
+@pytest.mark.parametrize("trigger", [(302, {"location": "/404"}, b""), (200, {}, b"")])
+async def test_private_dns_after_fallback_is_not_retried(monkeypatch, trigger) -> None:
+    install_redirect_scenario(monkeypatch, [trigger])
     calls = 0
 
     async def resolver(url):
@@ -482,11 +577,12 @@ async def test_private_dns_after_fallback_is_not_retried(monkeypatch) -> None:
     assert RedirectSession.instances[1].calls == []
 
 
-async def test_mobile_fallback_cannot_change_the_requested_note(monkeypatch) -> None:
+@pytest.mark.parametrize("trigger", [(302, {"location": "/404"}, b""), (200, {}, b"")])
+async def test_mobile_fallback_cannot_change_the_requested_note(monkeypatch, trigger) -> None:
     other_url = "https://www.xiaohongshu.com/explore/bbbbbbbbbbbbbbbbbbbbbbbb"
     resolved = install_redirect_scenario(
         monkeypatch,
-        [(302, {"location": "/404"}, b""), (302, {"location": other_url}, b"")],
+        [trigger, (302, {"location": other_url}, b"")],
     )
     with pytest.raises(AppError) as caught:
         await XiaohongshuClient(Settings(api_key="x", environment="test")).fetch(
@@ -497,8 +593,9 @@ async def test_mobile_fallback_cannot_change_the_requested_note(monkeypatch) -> 
     assert [len(s.calls) for s in RedirectSession.instances] == [1, 1]
 
 
-async def test_cancellation_during_mobile_resolution_closes_session(monkeypatch) -> None:
-    install_redirect_scenario(monkeypatch, [(302, {"location": "/404"}, b"")])
+@pytest.mark.parametrize("trigger", [(302, {"location": "/404"}, b""), (200, {}, b"")])
+async def test_cancellation_during_mobile_resolution_closes_session(monkeypatch, trigger) -> None:
+    install_redirect_scenario(monkeypatch, [trigger])
     started = asyncio.Event()
     closed = []
     original_resolve = __import__("app.parser.client", fromlist=["resolve_url"]).resolve_url

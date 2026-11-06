@@ -1,4 +1,4 @@
-"""Bounded extraction of window.__INITIAL_STATE__ JSON."""
+"""Bounded extraction and data-only normalization of initial state."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ MARKER = "window.__INITIAL_STATE__"
 MAX_STATE_CHARS = 2 * 1024 * 1024
 MAX_DEPTH = 80
 MAX_NODES = 200_000
+JSON_WHITESPACE = " \t\r\n"
 
 
 @dataclass(frozen=True)
@@ -46,7 +47,7 @@ def extract_initial_state(html: str) -> str:
     escaped = False
     index += 1
     while index < len(html):
-        if index - begin > MAX_STATE_CHARS:
+        if index - begin >= MAX_STATE_CHARS:
             raise AppError("PARSE_FAILED", 502, detail="initial state exceeds limit")
         char = html[index]
         if in_string:
@@ -73,8 +74,37 @@ def extract_initial_state(html: str) -> str:
     raise AppError("PARSE_FAILED", 502, detail="initial state is truncated")
 
 
-def replace_value_undefined(source: str) -> str:
+def _skip_json_space(source: str, index: int) -> int:
+    while index < len(source) and source[index] in JSON_WHITESPACE:
+        index += 1
+    return index
+
+
+def _set_array_start(source: str, index: int) -> int | None:
+    """Recognize only the literal prefix of new Set(array), never an expression."""
+    if not source.startswith("new", index):
+        return None
+    index += 3
+    if index >= len(source) or source[index] not in JSON_WHITESPACE:
+        return None
+    for token in ("Set", "("):
+        index = _skip_json_space(source, index)
+        if not source.startswith(token, index):
+            return None
+        index += len(token)
+    index = _skip_json_space(source, index)
+    return index if index < len(source) and source[index] == "[" else None
+
+
+def _normalize_state_values(source: str) -> str:
+    """Preserve strings; normalize undefined and exact Set-array value wrappers.
+
+    The extracted source is already bounded and balanced. Arrays track whether
+    their close must also consume one constructor parenthesis. The final JSON
+    decoder validates every remaining token; no constructor is executed.
+    """
     output: list[str] = []
+    set_arrays: list[bool] = []
     index = 0
     in_string = False
     escaped = False
@@ -98,11 +128,19 @@ def replace_value_undefined(source: str) -> str:
             index += 1
             continue
         if char in "[:,":
+            if char == "[":
+                set_arrays.append(False)
             expecting_value = char in "[:,"
             output.append(char)
             index += 1
             continue
         if char in "}]":
+            if char == "]" and set_arrays.pop():
+                index = _skip_json_space(source, index + 1)
+                if index >= len(source) or source[index] != ")":
+                    raise AppError(
+                        "PARSE_FAILED", 502, detail="Set constructor must end after its array"
+                    )
             expecting_value = False
             output.append(char)
             index += 1
@@ -111,6 +149,13 @@ def replace_value_undefined(source: str) -> str:
             output.append(char)
             index += 1
             continue
+        if expecting_value:
+            array_start = _set_array_start(source, index)
+            if array_start is not None:
+                output.append("[")
+                set_arrays.append(True)
+                index = array_start + 1
+                continue
         if expecting_value and source.startswith("undefined", index):
             end = index + len("undefined")
             if end == len(source) or not (source[end].isalnum() or source[end] in "_$"):
@@ -137,7 +182,7 @@ def _walk(value: Any, depth: int = 0) -> Iterator[Any]:
 
 
 def decode_initial_state(html: str) -> dict[str, Any]:
-    raw = replace_value_undefined(extract_initial_state(html))
+    raw = _normalize_state_values(extract_initial_state(html))
     try:
         state = json.loads(raw)
     except ValueError as exc:

@@ -106,3 +106,41 @@ Added three observed exact Live Photo video hosts after bounded HTTPS MP4 header
 ### Status
 
 [OK] **Completed**
+
+
+## Session 5: Handle bounded rednote Set state serialization
+
+**Date**: 2026-11-06
+**Task**: Handle bounded rednote Set state serialization
+**Branch**: `main`
+
+### Summary
+
+Verified extraction succeeds before decoding fails on synthetic new Set(array). Added string-aware data-only Set wrapper normalization, exact source-size enforcement and 50 offline regressions. Full suite 286 passed; Ruff, Mypy, compilation, OpenAPI JSON and whitespace checks passed. Three authorized live samples passed via independent ASGI app; local responses did not reach rednote, so VPS recovery remains unverified. Added explicit synthetic fixture and VPS verification steps. No Git writes, new task, service restart or deployment.
+
+### Git Commits
+
+(No commits - planning session)
+
+### Status
+
+[OK] **Completed**
+
+
+## Session 6: Recover bounded empty detail responses with complete mobile motion
+
+**Date**: 2026-11-06
+**Task**: Recover bounded empty detail responses with complete mobile motion
+**Branch**: `main`
+
+### Summary
+
+Reproduced both user failures as checked HTTP 200 text/plain zero-byte details, before Set parsing. Added typed one-shot mobile recovery on full checked detail URLs within shared attempts, redirects, identity and deadline checks; enabled mobile image motion only with complete detail still and shared supported MP4 pair. Full suite 309 passed; Ruff, Mypy, compilation, OpenAPI JSON and whitespace checks passed. Restarted local service; all three real refresh requests returned 200 including one paired Live Photo. Upstream later served desktop HTML again; deterministic empty-response branch evidence is synthetic. No Git writes, new task or VPS changes.
+
+### Git Commits
+
+(No commits - planning session)
+
+### Status
+
+[OK] **Completed**
