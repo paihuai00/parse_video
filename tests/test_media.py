@@ -7,6 +7,71 @@ from app.parser.media import normalize_media_url, normalize_mobile_note, normali
 from app.parser.state_reader import decode_initial_state, select_note
 
 
+@pytest.mark.parametrize(
+    "host", ["sns-video-v4.xhscdn.com", "sns-bak-v1.xhscdn.com", "sns-bak-v6.xhscdn.com"]
+)
+def test_observed_live_photo_hosts_preserve_motion_and_signed_query(host: str) -> None:
+    result = normalize_note(
+        "aaaaaaaaaaaaaaaaaaaaaaaa",
+        {
+            "type": "normal",
+            "imageList": [
+                {
+                    "urlDefault": "https://sns-webpic-qc.xhscdn.com/still.jpg",
+                    "width": 1400,
+                    "height": 1200,
+                    "livePhoto": True,
+                    "stream": {"h264": [{"masterUrl": f"http://{host}/motion.mp4?sig=synthetic"}]},
+                }
+            ],
+        },
+    )
+    assert result.videos == ()
+    motion = result.images[0].live_video
+    assert motion is not None
+    assert motion.url == f"https://{host}/motion.mp4?sig=synthetic"
+    assert motion.codec == "H264"
+    assert motion.source_width is None
+    assert motion.source_height is None
+
+
+@pytest.mark.parametrize(
+    "host", ["sns-video-v4.xhscdn.com", "sns-bak-v1.xhscdn.com", "sns-bak-v6.xhscdn.com"]
+)
+@pytest.mark.parametrize("path", ["motion.m3u8", "ambiguous"])
+def test_observed_live_photo_hosts_still_require_mp4_evidence(host: str, path: str) -> None:
+    with pytest.raises(AppError) as caught:
+        normalize_note(
+            "aaaaaaaaaaaaaaaaaaaaaaaa",
+            {
+                "type": "normal",
+                "imageList": [
+                    {
+                        "urlDefault": "https://sns-webpic-qc.xhscdn.com/still.jpg",
+                        "livePhoto": True,
+                        "stream": {"h264": [{"masterUrl": f"https://{host}/{path}"}]},
+                    }
+                ],
+            },
+        )
+    assert caught.value.code == "MEDIA_NOT_FOUND"
+
+
+@pytest.mark.parametrize(
+    "host", ["sns-video-v4.xhscdn.com", "sns-bak-v1.xhscdn.com", "sns-bak-v6.xhscdn.com"]
+)
+@pytest.mark.parametrize(
+    "authority", ["{host}.evil.example", "evil{host}", "user:pass@{host}", "{host}:444"]
+)
+def test_observed_live_photo_hosts_reject_unsafe_authorities(host: str, authority: str) -> None:
+    assert normalize_media_url(f"https://{authority.format(host=host)}/motion.mp4") is None
+
+
+@pytest.mark.parametrize("host", ["sns-video-v999.xhscdn.com", "sns-bak-v999.xhscdn.com"])
+def test_unobserved_video_shards_remain_rejected(host: str) -> None:
+    assert normalize_media_url(f"https://{host}/motion.mp4") is None
+
+
 @pytest.mark.parametrize("host", ["sns-i11.rednotecdn.com", "sns-i27.rednotecdn.com"])
 def test_regional_image_shards_preserve_full_media_url(host: str) -> None:
     url = f"http://{host}/image.jpg?sig=synthetic"

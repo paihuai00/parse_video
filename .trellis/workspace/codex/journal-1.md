@@ -87,3 +87,22 @@
 ### Next Steps
 
 - 用户手动提交并同步VPS；按部署prompt保留旧镜像、重建并重建容器、核对源码和镜像、执行VPS媒体及公网验收，失败回滚。
+
+
+## Session 4: Fix exact Live Photo CDN host compatibility
+
+**Date**: 2026-11-06
+**Task**: Fix exact Live Photo CDN host compatibility
+**Branch**: `main`
+
+### Summary
+
+Added three observed exact Live Photo video hosts after bounded HTTPS MP4 header verification. Added 29 offline regressions; full suite 236 passed; Ruff, Mypy, compilation, OpenAPI JSON and diff checks passed. Restarted local development service; authorized real request returned one image with one paired motion MP4 and cache miss. No new task, VPS changes or Git writes.
+
+### Git Commits
+
+(No commits - planning session)
+
+### Status
+
+[OK] **Completed**

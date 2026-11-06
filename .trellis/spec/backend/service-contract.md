@@ -75,6 +75,7 @@ Success response invariants:
 - `success=true`, `error=null`, and a fresh `meta.request_id` for every caller.
 - Image note: ordered non-empty `images`, empty top-level `videos`, `cover=null`. Each image may contain one nested `live_video`; ordinary images omit the field entirely.
 - Live Photo: keep the still image at its original image position and attach exactly one positively identified MP4 to that image. Select motion metadata only from the video candidate; never copy still-image width/height onto it.
+- Observed Live Photo delivery also uses exact `sns-video-v4.xhscdn.com`, `sns-bak-v1.xhscdn.com`, and `sns-bak-v6.xhscdn.com`. These are individual additions to the shared media allowlist, not permission for arbitrary numbered video/backup shards. Preserve the master/backup query and require the same positive MP4 evidence; unknown hosts remain rejected. Sanitized acquisition and header evidence is recorded in `docs/live-photo-cdn-fix-2026-11-06.md`.
 - Video note: empty `images`, exactly one positively identified MP4, and an optional separate cover.
 - Every media object uses `verification="not_checked"`; `url_expires_at` stays `null` unless an actual expiry is known.
 - Cache expiry describes only this service's result cache and never promises CDN availability.

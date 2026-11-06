@@ -56,6 +56,75 @@ def mobile_pipeline(monkeypatch, html):
 
 
 @pytest.mark.parametrize("route", ["/api/v1/xiaohongshu/parse", "/api/v1/parse"])
+@pytest.mark.parametrize(
+    ("master_host", "backup_hosts", "expected_host"),
+    [
+        (
+            "sns-video-v4.xhscdn.com",
+            ["sns-bak-v1.xhscdn.com", "sns-bak-v6.xhscdn.com"],
+            "sns-video-v4.xhscdn.com",
+        ),
+        ("unverified.xhscdn.com", ["sns-bak-v1.xhscdn.com"], "sns-bak-v1.xhscdn.com"),
+        ("unverified.xhscdn.com", ["sns-bak-v6.xhscdn.com"], "sns-bak-v6.xhscdn.com"),
+    ],
+)
+def test_observed_live_photo_cdn_hosts_return_complete_api_result(
+    monkeypatch, route, master_host, backup_hosts, expected_host
+) -> None:
+    state = {
+        "note": {
+            "noteDetailMap": {
+                NOTE_ID: {
+                    "note": {
+                        "type": "normal",
+                        "imageList": [
+                            {
+                                "urlDefault": "https://sns-webpic-qc.xhscdn.com/still.jpg",
+                                "livePhoto": True,
+                                "stream": {
+                                    "h264": [
+                                        {
+                                            "masterUrl": f"http://{master_host}/motion.mp4?sig=synthetic",
+                                            "backupUrls": [
+                                                f"http://{host}/motion.mp4?sig=synthetic"
+                                                for host in backup_hosts
+                                            ],
+                                        }
+                                    ]
+                                },
+                            }
+                        ],
+                    }
+                }
+            }
+        }
+    }
+    http = mobile_pipeline(monkeypatch, "")
+    PipelineSession.responses = [
+        (302, {"location": DETAIL_URL}, b""),
+        (200, {}, ("window.__INITIAL_STATE__=" + json.dumps(state)).encode()),
+    ]
+    with http:
+        response = http.post(
+            route,
+            headers={"X-API-Key": "test-key"},
+            json={"url": SHORT_URL, "refresh": True},
+        )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is True
+    assert payload["error"] is None
+    assert payload["meta"]["cache"]["hit"] is False
+    assert payload["data"]["videos"] == []
+    images = payload["data"]["images"]
+    assert len(images) == 1
+    assert images[0]["index"] == 1
+    assert images[0]["url"] == "https://sns-webpic-qc.xhscdn.com/still.jpg"
+    assert images[0]["live_video"]["url"] == (f"https://{expected_host}/motion.mp4?sig=synthetic")
+    assert PipelineSession.calls == [("chrome136", SHORT_URL), ("chrome136", DETAIL_URL)]
+
+
+@pytest.mark.parametrize("route", ["/api/v1/xiaohongshu/parse", "/api/v1/parse"])
 def test_real_parse_pipeline_returns_complete_mobile_images_and_shares_cache(
     monkeypatch, fixture_html, route
 ) -> None:
