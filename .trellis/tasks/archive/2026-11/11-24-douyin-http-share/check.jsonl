@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"离线测试与真实样本验收规则"}
+{"file":".trellis/spec/backend/service-contract.md","reason":"验证契约、回退边界和多平台行为"}
+{"file":".trellis/spec/backend/error-handling.md","reason":"核对状态码及公开错误"}
+{"file":".trellis/spec/backend/logging-guidelines.md","reason":"核对日志和验收证据脱敏"}
+{"file":".trellis/tasks/archive/2026-11/11-24-douyin-http-share/research/douyin-share-http.md","reason":"复测目标完整下载并记录环境差异"}

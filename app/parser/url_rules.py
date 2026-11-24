@@ -153,13 +153,12 @@ def is_public_address(address: str) -> bool:
     return parsed.is_global and not parsed.is_multicast
 
 
-async def resolve_url(raw_url: str) -> ResolvedHop:
-    parsed = parse_url(raw_url)
+async def resolve_public_addresses(host: str, port: int) -> tuple[str, ...]:
     loop = asyncio.get_running_loop()
     try:
         infos = await loop.getaddrinfo(
-            parsed.host,
-            parsed.port,
+            host,
+            port,
             family=socket.AF_UNSPEC,
             type=socket.SOCK_STREAM,
             proto=socket.IPPROTO_TCP,
@@ -169,6 +168,12 @@ async def resolve_url(raw_url: str) -> ResolvedHop:
     addresses = tuple(dict.fromkeys(info[4][0] for info in infos))
     if not addresses or any(not is_public_address(address) for address in addresses):
         raise invalid_url("hostname resolved to a non-public address")
+    return addresses
+
+
+async def resolve_url(raw_url: str) -> ResolvedHop:
+    parsed = parse_url(raw_url)
+    addresses = await resolve_public_addresses(parsed.host, parsed.port)
     return ResolvedHop(
         normalized_url=parsed.normalized_url,
         host=parsed.host,

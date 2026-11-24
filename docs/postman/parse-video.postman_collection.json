@@ -1,0 +1,366 @@
+{
+  "info": {
+    "name": "parse_video 本机 HTTP 验收",
+    "description": "使用本机环境变量填写 API 密钥和授权样本。按文件夹运行，先解析抖音，再从 CDN 独立 GET。",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8000"
+    },
+    {
+      "key": "apiKey",
+      "value": ""
+    },
+    {
+      "key": "douyinUrl",
+      "value": ""
+    },
+    {
+      "key": "douyinExpectedId",
+      "value": ""
+    },
+    {
+      "key": "xiaohongshuUrl",
+      "value": ""
+    },
+    {
+      "key": "douyinImageUrl",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "基础检查",
+      "item": [
+        {
+          "name": "健康检查",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/healthz"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"服务健康\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json()).to.have.property(\"status\", \"ok\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "未提供 API 密钥",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/parse",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://example.com/video\",\n  \"refresh\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"拒绝未授权请求\", () => {",
+                  "    pm.response.to.have.status(401);",
+                  "    pm.expect(pm.response.json().error.code).to.equal(\"UNAUTHORIZED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "不支持的域名",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/parse",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://example.com/video\",\n  \"refresh\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"拒绝非支持平台的链接\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.json().error.code).to.equal(\"INVALID_URL\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "抖音视频",
+      "item": [
+        {
+          "name": "解析抖音视频",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/parse",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"{{douyinUrl}}\",\n  \"refresh\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset(\"douyinMediaUrl\");",
+                  "pm.test(\"统一接口返回指定抖音作品和 MP4 直链\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(pm.response.code, body.error?.code).to.equal(200);",
+                  "    pm.expect(body.success).to.equal(true);",
+                  "    pm.expect(body.data.type).to.equal(\"video\");",
+                  "    pm.expect(body.data.note_id).to.match(/^\\d{18,20}$/);",
+                  "    const expectedId = pm.variables.get(\"douyinExpectedId\");",
+                  "    if (expectedId) pm.expect(body.data.note_id).to.equal(expectedId);",
+                  "    pm.expect(body.data.videos).to.have.lengthOf(1);",
+                  "    pm.expect(body.data.videos[0].format).to.equal(\"mp4\");",
+                  "    pm.expect(body.data.videos[0].url).to.match(/^https:\\/\\//);",
+                  "    pm.collectionVariables.set(\"douyinMediaUrl\", body.data.videos[0].url);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "下载抖音 MP4",
+          "request": {
+            "method": "GET",
+            "url": "{{douyinMediaUrl}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset(\"douyinMediaUrl\");",
+                  "pm.test(\"独立请求收到完整 MP4\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"video/mp4\");",
+                  "    const file = pm.response.stream;",
+                  "    pm.expect(file.length).to.be.above(12);",
+                  "    pm.expect(String.fromCharCode(file[4], file[5], file[6], file[7])).to.equal(\"ftyp\");",
+                  "    const length = pm.response.headers.get(\"Content-Length\");",
+                  "    if (length) pm.expect(file.length).to.equal(Number(length));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "小红书回归",
+      "item": [
+        {
+          "name": "统一接口解析小红书",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/parse",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"{{xiaohongshuUrl}}\",\n  \"refresh\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"小红书按现有契约返回有效媒体\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(pm.response.code, body.error?.code).to.equal(200);",
+                  "    pm.expect(body.success).to.equal(true);",
+                  "    pm.expect(body.data.note_id).to.match(/^[0-9a-fA-F]{24}$/);",
+                  "    pm.expect(body.data.type).to.be.oneOf([\"image\", \"video\"]);",
+                  "    const media = body.data.type === \"video\" ? body.data.videos : body.data.images;",
+                  "    pm.expect(media.length).to.be.above(0);",
+                  "    pm.expect(media[0].url).to.match(/^https:\\/\\//);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "旧接口解析小红书",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/xiaohongshu/parse",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"{{xiaohongshuUrl}}\",\n  \"refresh\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"小红书按现有契约返回有效媒体\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(pm.response.code, body.error?.code).to.equal(200);",
+                  "    pm.expect(body.success).to.equal(true);",
+                  "    pm.expect(body.data.note_id).to.match(/^[0-9a-fA-F]{24}$/);",
+                  "    pm.expect(body.data.type).to.be.oneOf([\"image\", \"video\"]);",
+                  "    const media = body.data.type === \"video\" ? body.data.videos : body.data.images;",
+                  "    pm.expect(media.length).to.be.above(0);",
+                  "    pm.expect(media[0].url).to.match(/^https:\\/\\//);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "抖音图文回归",
+      "item": [
+        {
+          "name": "统一接口解析抖音静态图文",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/parse",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"{{douyinImageUrl}}\",\n  \"refresh\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"返回完整的静态图文媒体列表\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(pm.response.code, body.error?.code).to.equal(200);",
+                  "    pm.expect(body.data.type).to.equal(\"image\");",
+                  "    pm.expect(body.data.note_id).to.match(/^\\d{18,20}$/);",
+                  "    pm.expect(body.data.videos).to.have.lengthOf(0);",
+                  "    pm.expect(body.data.images.length).to.be.above(0);",
+                  "    body.data.images.forEach((image, i) => pm.expect(image.index).to.equal(i + 1));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

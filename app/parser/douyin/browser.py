@@ -15,7 +15,11 @@ from app.config import Settings
 from app.errors import AppError
 from app.parser.client import Deadline
 from app.parser.douyin.egress_proxy import BoundedConnectProxy
-from app.parser.douyin.state_reader import decode_detail_response, decode_flight_detail
+from app.parser.douyin.state_reader import (
+    classify_douyin_page_text,
+    decode_detail_response,
+    decode_flight_detail,
+)
 from app.parser.douyin.url_rules import PAGE_HOSTS, ParsedDouyinUrl, parse_douyin_url
 
 SCRIPT_HOSTS = frozenset(
@@ -226,7 +230,7 @@ class DouyinBrowser:
                         )
                         if not isinstance(text, str):
                             text = ""
-                        _classify_missing_page(page.url, text)
+                        classify_douyin_page_text(page.url, text)
                         raise AppError("PARSE_FAILED", 502, detail="Douyin target detail absent")
                     return final.item_id, detail
                 finally:
@@ -318,19 +322,6 @@ def _item_id_from_detail_url(url: str) -> str | None:
     if value is not None and value.isdigit() and 18 <= len(value) <= 20:
         return value
     return None
-
-
-def _classify_missing_page(url: str, text: str) -> None:
-    lowered = text.lower()
-    path = urlsplit(url).path.lower()
-    if any(marker in text for marker in ("作品已删除", "作品不存在", "内容已下架")):
-        raise AppError("NOTE_NOT_FOUND", 404, detail="Douyin explicitly reported missing work")
-    if "/login" in path or any(marker in text for marker in ("登录后查看该作品", "请先登录后查看")):
-        raise AppError("UPSTREAM_LOGIN_REQUIRED", 503, detail="Douyin requires login")
-    if any(marker in lowered for marker in ("captcha", "verify-page")) or any(
-        marker in text for marker in ("安全验证", "完成验证")
-    ):
-        raise AppError("UPSTREAM_ACCESS_RESTRICTED", 503, detail="Douyin verification challenge")
 
 
 def _blocked_document_error(url: str) -> AppError:

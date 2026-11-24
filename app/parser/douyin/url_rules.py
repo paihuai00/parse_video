@@ -56,8 +56,8 @@ def _item_id(value: str) -> str:
     return value
 
 
-def parse_douyin_url(raw_url: str) -> ParsedDouyinUrl:
-    if not raw_url or len(raw_url) > 4096:
+def douyin_https_parts(raw_url: str, max_length: int = 4096) -> SplitResult:
+    if not raw_url or len(raw_url) > max_length:
         raise invalid_url("URL is empty or too long")
     if raw_url != raw_url.strip() or any(
         char.isspace() or ord(char) < 32 or ord(char) == 127 for char in raw_url
@@ -67,12 +67,24 @@ def parse_douyin_url(raw_url: str) -> ParsedDouyinUrl:
         parts = urlsplit(raw_url)
     except ValueError as exc:
         raise invalid_url("URL could not be parsed") from exc
-    if parts.scheme.lower() != "https" or parts.username or parts.password or parts.fragment:
+    if (
+        parts.scheme.lower() != "https"
+        or parts.username is not None
+        or parts.password is not None
+        or parts.fragment
+    ):
         raise invalid_url("URL must be credential-free HTTPS without a fragment")
+    _host(parts)
+    return parts
+
+
+def parse_douyin_url(raw_url: str) -> ParsedDouyinUrl:
+    parts = douyin_https_parts(raw_url)
     host = _host(parts)
     if host not in PAGE_HOSTS:
         raise invalid_url("unsupported Douyin host")
     segments = _segments(parts)
+    path = parts.path or "/"
     item_id: str | None = None
     kind: str | None = None
     is_short = host == SHORT_HOST
@@ -84,10 +96,21 @@ def parse_douyin_url(raw_url: str) -> ParsedDouyinUrl:
             raise invalid_url("unsupported Douyin detail path")
         kind, item_id = segments[0], _item_id(segments[1])
     else:
-        if len(segments) != 3 or segments[:2] not in (["share", "video"], ["share", "note"]):
+        if (
+            len(segments) != 3
+            or segments[0] != "share"
+            or segments[1]
+            not in {
+                "video",
+                "note",
+                "slides",
+            }
+        ):
             raise invalid_url("unsupported Douyin share path")
         kind, item_id = segments[1], _item_id(segments[2])
-    normalized = urlunsplit(("https", host, parts.path or "/", parts.query, ""))
+        if kind == "slides":
+            host, kind, path = DETAIL_HOST, "note", f"/note/{item_id}"
+    normalized = urlunsplit(("https", host, path, parts.query, ""))
     return ParsedDouyinUrl(normalized, host, item_id, kind, is_short)
 
 

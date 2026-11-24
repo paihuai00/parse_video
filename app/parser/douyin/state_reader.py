@@ -3,14 +3,64 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Iterable
 from typing import Any
+from urllib.parse import urlsplit
 
 from app.errors import AppError
 
 FLIGHT_PREFIX = "self.__pace_f.push("
+SHARE_STATE = re.compile(r"\bwindow\._ROUTER_DATA\s*=\s*")
 MAX_NODES = 100_000
 MAX_DEPTH = 40
+
+
+def decode_share_detail(html: str, target_id: str) -> dict[str, Any] | None:
+    marker = SHARE_STATE.search(html)
+    if marker is None:
+        return None
+    try:
+        state, _ = json.JSONDecoder().raw_decode(html, marker.end())
+    except json.JSONDecodeError:
+        return None
+    except RecursionError as exc:
+        raise AppError(
+            "UPSTREAM_BAD_RESPONSE", 502, detail="Douyin share state is too deep"
+        ) from exc
+
+    try:
+        page = state["loaderData"]["video_(id)/page"]
+        items = page["videoInfoRes"]["item_list"]
+    except (KeyError, TypeError):
+        return None
+    if not isinstance(items, list):
+        return None
+    page_id = page.get("itemId")
+    if page_id is not None and str(page_id) != target_id:
+        raise AppError("PARSE_FAILED", 502, detail="Douyin share page target mismatch")
+    details = [
+        item for item in items if isinstance(item, dict) and item.get("aweme_id") is not None
+    ]
+    for detail in details:
+        if str(detail["aweme_id"]) == target_id:
+            return detail
+    if details:
+        raise AppError("PARSE_FAILED", 502, detail="Douyin share detail target mismatch")
+    return None
+
+
+def classify_douyin_page_text(url: str, text: str) -> None:
+    lowered = text.lower()
+    path = urlsplit(url).path.lower()
+    if any(marker in text for marker in ("作品已删除", "作品不存在", "内容已下架")):
+        raise AppError("NOTE_NOT_FOUND", 404, detail="Douyin explicitly reported missing work")
+    if "/login" in path or any(marker in text for marker in ("登录后查看该作品", "请先登录后查看")):
+        raise AppError("UPSTREAM_LOGIN_REQUIRED", 503, detail="Douyin requires login")
+    if any(marker in lowered for marker in ("captcha", "verify-page")) or any(
+        marker in text for marker in ("安全验证", "完成验证")
+    ):
+        raise AppError("UPSTREAM_ACCESS_RESTRICTED", 503, detail="Douyin verification challenge")
 
 
 def decode_detail_response(raw: bytes, target_id: str, max_bytes: int) -> dict[str, Any] | None:

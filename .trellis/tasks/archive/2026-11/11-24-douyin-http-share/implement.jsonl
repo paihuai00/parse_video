@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/index.md","reason":"定位 FastAPI 后端分层规范"}
+{"file":".trellis/spec/backend/service-contract.md","reason":"延续统一接口、出站和媒体规则"}
+{"file":".trellis/spec/backend/error-handling.md","reason":"将采集失败映射为现有错误"}
+{"file":".trellis/spec/backend/logging-guidelines.md","reason":"访问参数和签名 URL 的脱敏规则"}
+{"file":".trellis/tasks/archive/2026-11/11-24-douyin-http-share/research/douyin-share-http.md","reason":"已验证采集顺序与媒体元数据差异"}

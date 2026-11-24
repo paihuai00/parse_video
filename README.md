@@ -34,6 +34,12 @@ curl --request POST http://127.0.0.1:8000/api/v1/parse \
 
 旧调用方可继续使用 `POST /api/v1/xiaohongshu/parse`。成功响应中的 `images[].url`、可选的 `images[].live_video.url` 或 `videos[0].url` 是临时直链。普通图片省略 `live_video`；小红书 Live Photo 的静态图和动态 MP4 保持在同一个图片项中。抖音动态图片首版明确拒绝，避免静默丢失运动部分。
 
+### 在 Postman 中下载抖音视频
+
+导入 [本机验收 Collection](docs/postman/parse-video.postman_collection.json)，在本地环境中填写 `apiKey` 和 `douyinUrl`。默认服务地址为 `http://127.0.0.1:8000`。运行 **抖音视频** 文件夹，先解析，再向返回的 `data.videos[0].url` 发送独立 GET。也可以把这个地址复制到新的 GET 请求中保存 MP4。直链过期时重新解析原分享链接。
+
+**小红书回归**和**抖音图文回归**分别使用授权样本变量 `xiaohongshuUrl` 和 `douyinImageUrl`。
+
 ## Docker
 
 复制配置并设置密钥：
@@ -46,7 +52,7 @@ docker compose build
 docker compose up -d
 ```
 
-Compose 默认只绑定 `127.0.0.1:8000`，以 UID/GID `10001`、单 Uvicorn worker、只读文件系统运行。`/tmp` 与非 root 浏览器的 `/home/app` 分别使用有界 tmpfs，后者为 Chromium 配置和 crashpad 元数据提供临时可写目录。镜像包含固定版本 Chromium，并应用配套的 seccomp sandbox profile；每次抖音解析使用独立浏览器进程和匿名上下文，PID、并发、请求数、隧道字节及总时限均受限。公网接入示例见 `deploy/nginx.conf.example`。
+Compose 默认只绑定 `127.0.0.1:8000`，以 UID/GID `10001`、单 Uvicorn worker、只读文件系统运行。抖音普通视频优先在匿名 HTTP 会话中读取移动分享页。镜像中的 Chromium 供抖音图文和有限回退使用，浏览器任务使用独立进程、匿名上下文和沙箱。其临时文件位于有界的 `/tmp` 或 `/home/app`。公网接入示例见 `deploy/nginx.conf.example`。
 
 2026-10-20 的本机 Docker Desktop `linux/arm64` 验收确认了缺失/空生产密钥会启动失败、容器健康检查通过，并且 512 MiB 内存、256 PID、只读根、64 MiB `/tmp`、16 MiB 非 root HOME 与 `json-file` 日志轮转配置已应用。受限容器内的抖音真实请求成功，但内存发生上限回收，因此生产保持浏览器并发 1 并在目标 VPS 复测。该结果不替代目标 VPS 验收。
 

@@ -7,7 +7,7 @@
 - Python 3.12，基础镜像采用 `python:3.12.8-slim-bookworm`；仍需在目标 Linux 架构验证镜像构建。
 - FastAPI + Uvicorn，固定 **1 个 worker**，容器内监听 `0.0.0.0:8000`。
 - 固定 `curl_cffi==0.13.0` 和桌面 `XHS_IMPERSONATE=chrome136`，保留 TLS 证书验证。安全详情页跳向同主机精确 `/404` 时，客户端可用固定 `safari184_ios` 做一次匿名移动获取；无需安装 Safari、macOS 或 iOS。不要仅修改环境变量替代完整的移动状态/图片适配；升级库或请求配置仍需重新验证样本。
-- 固定 `playwright==1.64.0` 及配套 Chromium。抖音解析使用新的匿名浏览器进程和上下文，完整 Chromium 沙箱开启；应用进程仍以 UID/GID 10001 运行。
+- 抖音普通视频优先通过匿名 HTTP 获取移动分享页，读取作品并解析短期 CDN 直链。抖音图文和有限回退使用固定版本的 Playwright 和 Chromium，浏览器继续在沙箱中的独立匿名上下文运行。应用进程仍以 UID/GID 10001 运行。
 - 单进程使用内存缓存、并发限制和有界等待队列，不依赖数据库、Redis 或任务服务。重启清空这些内存状态；增加 worker 会让限流与缓存分裂，不能直接作为扩容办法。
 - API 只返回图片、每张小红书图片可选的 Live Photo 动态 MP4、普通视频主地址及元数据，不代理、保存或转码媒体。调用方直接访问对应平台 CDN。
 - 本机端口只映射至 VPS 的 `127.0.0.1:8000`，公网入口通过现有 Nginx 提供 HTTPS。
@@ -143,7 +143,9 @@ X-API-Key: <部署时设置的密钥>
 
 初次验证保留分享链接的完整查询参数。`refresh:true` 只能跳过结果缓存，不能绕过鉴权、限流、并发或队列限制。具体成功及错误 JSON 以 API 契约文档为准，部署层不另定义一套返回结构。
 
-统一入口还支持精确 `v.douyin.com` 短链、`www.douyin.com/video/<id>`、`www.douyin.com/note/<id>` 及已验证的 iesdouyin 分享路径。旧 `POST /api/v1/xiaohongshu/parse` 保留原行为。相似域和其他路径会返回 `INVALID_URL`；服务不会为了兼容短链而放宽 DNS、公网地址、端口或最终详情页校验。
+统一入口支持精确 `v.douyin.com` 短链、`www.douyin.com/video/<id>`、`www.douyin.com/note/<id>` 及 `www.iesdouyin.com/share/{video,note,slides}/<id>`。其中 `slides` 指向同 ID 的图文详情，动态图文仍返回 `UNSUPPORTED_CONTENT`。旧 `POST /api/v1/xiaohongshu/parse` 保留原行为。相似域和其他路径会返回 `INVALID_URL`。
+
+使用 [Postman Collection](postman/parse-video.postman_collection.json) 验收时，先用 `refresh: true` 解析抖音短链，随后从客户端用独立 GET 下载 `data.videos[0].url`。在本地 Postman 环境填写 API 密钥和授权样本链接。
 
 ### 第二步：先通过本机端口或 SSH 隧道验收
 

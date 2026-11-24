@@ -10,6 +10,7 @@ from app.models import InternalNote
 from app.parser.client import Deadline, PageResponse, XiaohongshuClient
 from app.parser.douyin.browser import DouyinBrowser
 from app.parser.douyin.media import normalize_douyin_note
+from app.parser.douyin.share_client import DouyinShareClient
 from app.parser.douyin.url_rules import douyin_cache_key, is_douyin_host, parse_douyin_url
 from app.parser.media import normalize_mobile_note, normalize_note
 from app.parser.state_reader import decode_initial_state, select_note_layout
@@ -49,12 +50,22 @@ class XiaohongshuAdapter:
 class DouyinAdapter:
     def __init__(self, settings: Settings, browser: DouyinBrowser | None = None) -> None:
         self.browser = browser or DouyinBrowser(settings)
+        self.share_client = DouyinShareClient(settings)
 
     def cache_identity(self, raw_url: str) -> str:
         return douyin_cache_key(raw_url)
 
     async def parse(self, raw_url: str, deadline: Deadline) -> InternalNote:
-        target_id, detail = await self.browser.fetch_detail(raw_url, deadline)
+        target = parse_douyin_url(raw_url)
+        if target.is_short_link:
+            target = await self.share_client.resolve_short_link(target, deadline)
+        if target.kind == "video":
+            note = await self.share_client.fetch_video(target, deadline)
+            if note is not None:
+                return note
+        target_id, detail = await self.browser.fetch_detail(target.normalized_url, deadline)
+        if target.item_id is not None and target.item_id != target_id:
+            raise AppError("PARSE_FAILED", 502, detail="Douyin browser target mismatch")
         deadline.remaining()
         return normalize_douyin_note(target_id, detail)
 

@@ -53,6 +53,14 @@ def normalize_media_url(value: Any, *, kind: Literal["image", "video"] = "image"
 def select_note_layout(state: dict[str, Any], note_id: str) -> SelectedNote: ...
 def normalize_mobile_note(note_id: str, note: dict[str, Any]) -> InternalNote: ...
 
+class DouyinShareClient:
+    async def resolve_short_link(
+        self, initial: ParsedDouyinUrl, deadline: Deadline
+    ) -> ParsedDouyinUrl: ...
+    async def fetch_video(
+        self, target: ParsedDouyinUrl, deadline: Deadline
+    ) -> InternalNote | None: ...
+
 class DouyinBrowser:
     async def fetch_detail(
         self, raw_url: str, deadline: Deadline
@@ -69,7 +77,7 @@ Request fields:
 
 | Field | Type | Contract |
 | --- | --- | --- |
-| `url` | HTTP(S) URL | At most 4096 characters; exact Xiaohongshu detail/mobile/short-link forms or exact Douyin `v.douyin.com/<token>`, `www.douyin.com/{video,note}/<18-20-digit-id>`, and `www.iesdouyin.com/share/{video,note}/<id>` forms; checked redirects preserve access-significant query values and may not switch platforms |
+| `url` | HTTP(S) URL | At most 4096 characters; exact Xiaohongshu detail/mobile/short-link forms or exact Douyin `v.douyin.com/<token>`, `www.douyin.com/{video,note}/<18-20-digit-id>`, and `www.iesdouyin.com/share/{video,note,slides}/<id>` forms. Checked redirects preserve access-significant query values and stay within the same platform. |
 | `refresh` | boolean | Defaults to `false`; skips result cache but not authentication, rate, admission, concurrency, or deadline controls |
 
 Success response invariants:
@@ -112,7 +120,13 @@ All desktop retries and mobile fallback share two total attempts, the original `
 
 The observed regional detail host `www.rednote.com` is explicitly supported with the same detail-path and per-hop transport checks. A safe same-origin `/404` from that host retries the already validated full regional detail URL in the fresh mobile session, preserving query values and note identity; replaying the short link would exhaust the shared three-redirect budget. Other hosts retain the original-input fallback. Desktop detail redirects also bind to the first established note identity. The regional static-image CDN rotates between observed `sns-i11.rednotecdn.com` and `sns-i27.rednotecdn.com`; accept only its `sns-i<ASCII digits>.rednotecdn.com` shard namespace. Arbitrary subdomains and lookalikes remain rejected. These additions do not enable arbitrary URL fetching or increase attempts, redirects, or time limits.
 
-Douyin acquisition starts a fresh Chromium process and anonymous context for one parse. Chromium uses only a loopback CONNECT proxy; the proxy accepts exact allowlisted HTTPS hosts, resolves them with a shared bounded timeout, rejects any non-public answer, and connects to the vetted IP so Chromium cannot re-resolve externally. Page routing allows only required document/script/XHR/fetch types, caps requests and tunnel bytes, blocks service workers, and uses the original 20-second `Deadline`. Detail responses are keyed by work ID so unrelated recommendations cannot win a race. React Flight scripts are read incrementally with a cumulative browser-side byte cap, including scripts appended after initial DOM load. Cancellation, timeout, browser failure, or proxy shutdown must close and await contexts, processes, tunnels, and handler tasks.
+Douyin short links expand through checked HTTP redirects. The exact mobile `/share/slides/<id>` image alias maps to the desktop `/note/<id>` path with the same ID and query. The browser path keeps the existing rejection of motion-bearing images. For ordinary videos, a fresh guest session receives the visitor cookie from the exact `www.iesdouyin.com` homepage, then reads `/share/video/<id>/` with the mobile user agent. The state reader selects the matching work from `window._ROUTER_DATA`. A separate session resolves the exact `aweme.snssdk.com` playback paths `/aweme/v1/playwm/` and `/aweme/v1/play/`. The playback redirect must point to an exact allowed video CDN host. Preserve its signed URL. Full independent MP4 requests verified `v5-se-bjtc-cold.douyinvod.com` and `v9-chc.douyinvod.com`.
+
+The HTTP path uses `curl_cffi`, manual redirects, TLS verification, and public DNS validation for each allowed host. Every upstream HTTP request connects to the vetted addresses. Response bytes and redirects are bounded and use the original `Deadline`. Preserve the play-address query and visitor-cookie isolation. Optional video metadata is populated only when it describes the selected rendition.
+
+Image works, safely unresolved short links, and videos whose eligible HTTP path returns no usable state or candidate use the browser path within the same deadline. Confirmed ID mismatches, unsafe destinations, explicit login, challenge, rate limits and expired deadlines fail with the existing errors.
+
+The browser path starts a fresh Chromium process and anonymous context. Chromium uses only a loopback CONNECT proxy; the proxy accepts exact allowlisted HTTPS hosts, resolves them with a shared bounded timeout, rejects any non-public answer, and connects to the vetted IP so Chromium cannot re-resolve externally. Page routing allows only required document/script/XHR/fetch types, caps requests and tunnel bytes, blocks service workers, and uses the original 20-second `Deadline`. Detail responses are keyed by work ID so unrelated recommendations cannot win a race. React Flight scripts are read incrementally with a cumulative browser-side byte cap, including scripts appended after initial DOM load. Cancellation, timeout, browser failure, or proxy shutdown must close and await contexts, processes, tunnels, and handler tasks.
 
 Host allowlisting is exact, never suffix-based. ASCII host case and at most one terminal DNS root dot are canonicalized; repeated trailing dots are rejected. `xhslink.cn` is accepted only for `/o/<token>` where the token is one non-empty ASCII URL-safe segment (`A-Z`, `a-z`, `0-9`, `-`, `_`). Its subdomains, lookalikes, encoded slashes or backslashes, dot traversal, extra path segments, Unicode tokens, overlong URLs, and other paths fail before connection. A short-link redirect receives the same host/path, DNS, address, port, TLS, and redirect-budget checks as the initial URL.
 
@@ -174,6 +188,7 @@ Every application and framework error uses `ParseError`. Nginx-generated 413/502
 - Mobile media: explicit `hasError=false`, ID mismatch and layout ambiguity, all image slots/types/order/dimensions, `H5_DTL` priority, normalized preview equivalence, unknown hosts, malformed/nonempty streams and motion markers. Verify full ParseService/API flows for both routes, shared cache with fresh caller metadata and failure without partial images. Use synthetic fixtures; live identity/media evidence stays redacted.
 - Parser/media: string-contained `undefined` is preserved, value-token `undefined` becomes null, the requested note ID is selected, image order and Live Photo ownership are stable, normal and per-image streams share deterministic MP4 selection, empty streams stay ordinary, missing Live Photo MP4 and unknown CDN/mixed media fail.
 - Service: success-only TTL/LRU, refresh bypass, two active leaders, four total waiters including followers, per-caller metadata, orphan cancellation/await, and cleanup on timeout/cancellation.
+- Douyin HTTP: exercise short and direct video links, per-parse visitor cookies, target-ID binding, exact playback path and CDN policy, mixed or non-public DNS rejection, signed query preservation, response limits, and missing-state fallback. Verify that explicit access errors and identity mismatches surface through the unified API. Use Postman with the actual Docker service to verify a fresh parse and complete independent MP4 download.
 - Douyin browser: exact work-ID response binding, incrementally bounded Flight scripts, exact egress hosts, private/mixed DNS rejection, pinned CONNECT targets, request/tunnel/state limits, fresh contexts, browser startup failure isolation, total-deadline cancellation, handler/process cleanup, and motion-image rejection.
 - API/logging: authentication variants, 404/405/validation/unexpected errors, no secret-bearing logs, and safe outcome/cache/note/capacity fields.
 - Deployment: `docker compose config --quiet`; build/non-root start/health on an available daemon; a read-only root must pair bounded writable `/tmp` and `/home/app` tmpfs mounts with the image's HOME/XDG paths, and `/home/app` remains owned by runtime UID/GID 10001 with mode 0700. Real probes use only user-authorized URLs and redacted output. Header checks select at most two representative files and, when Live Photos exist, cover one still plus one nested motion MP4.

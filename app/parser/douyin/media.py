@@ -3,36 +3,28 @@
 from __future__ import annotations
 
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlsplit
 
 from app.errors import AppError
 from app.models import InternalCover, InternalImage, InternalNote, InternalVideo
+from app.parser.douyin.url_rules import douyin_https_parts
 
 IMAGE_HOSTS = frozenset({"p3-pc-sign.douyinpic.com", "p9-pc-sign.douyinpic.com"})
-VIDEO_HOSTS = frozenset({"v11-weba.douyinvod.com", "v26-web.douyinvod.com"})
 VIDEO_HOST_PRIORITY = ("v11-weba.douyinvod.com", "v26-web.douyinvod.com")
+VIDEO_HOSTS = frozenset(
+    {*VIDEO_HOST_PRIORITY, "v5-se-bjtc-cold.douyinvod.com", "v9-chc.douyinvod.com"}
+)
 MEDIA_HOSTS = IMAGE_HOSTS | VIDEO_HOSTS
 
 
 def normalize_douyin_media_url(value: object, hosts: frozenset[str] = MEDIA_HOSTS) -> str | None:
-    if not isinstance(value, str) or not value or len(value) > 8192:
+    if not isinstance(value, str):
         return None
     try:
-        parts = urlsplit(value)
-        host = parts.hostname
-        port = parts.port
-    except ValueError:
+        parts = douyin_https_parts(value, max_length=8192)
+    except AppError:
         return None
-    if (
-        parts.scheme != "https"
-        or host not in hosts
-        or port not in (None, 443)
-        or parts.username
-        or parts.password
-        or parts.fragment
-    ):
-        return None
-    return value
+    return value if parts.hostname in hosts else None
 
 
 def _integer(value: object) -> int | None:
@@ -78,7 +70,9 @@ def _format_is_mp4(candidate: dict[str, Any], url: str) -> bool:
     if isinstance(format_value, str) and format_value.lower() == "mp4":
         return True
     parts = urlsplit(url)
-    return parts.path.lower().endswith(".mp4") or "mime_type=video_mp4" in parts.query.lower()
+    return parts.path.lower().endswith(".mp4") or ("mime_type", "video_mp4") in parse_qsl(
+        parts.query.lower()
+    )
 
 
 def _video_candidates(video: dict[str, Any]) -> list[dict[str, Any]]:
@@ -199,4 +193,20 @@ def normalize_douyin_note(target_id: str, detail: dict[str, Any]) -> InternalNot
         images=(),
         videos=(video,),
         cover=_cover(raw_video),
+    )
+
+
+def normalize_share_video(target_id: str, detail: dict[str, Any], media_url: str) -> InternalNote:
+    video = detail["video"]
+    # The playback redirect can change the rendition and add a watermark outro.
+    return normalize_douyin_note(
+        target_id,
+        {
+            "aweme_id": detail["aweme_id"],
+            "desc": detail.get("desc"),
+            "video": {
+                "play_addr": media_url,
+                "cover": video.get("cover"),
+            },
+        },
     )
