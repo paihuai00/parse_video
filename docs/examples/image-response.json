@@ -6,34 +6,34 @@
     "type": "image",
     "images": [
       {
-        "url": "https://media.example.com/image-1.jpg",
+        "url": "https://parser.example.com/api/v1/media/synthetic-resource?exp=1893456000&sig=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "source_width": 931,
         "source_height": 880,
-        "url_expires_at": null,
+        "url_expires_at": "2030-01-01T00:00:00Z",
         "verification": "not_checked",
         "index": 1
       },
       {
-        "url": "https://media.example.com/image-2.jpg",
+        "url": "https://parser.example.com/api/v1/media/synthetic-resource?exp=1893456000&sig=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "source_width": 1264,
         "source_height": 1395,
-        "url_expires_at": null,
+        "url_expires_at": "2030-01-01T00:00:00Z",
         "verification": "not_checked",
         "index": 2
       },
       {
-        "url": "https://media.example.com/image-3.jpg",
+        "url": "https://parser.example.com/api/v1/media/synthetic-resource?exp=1893456000&sig=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "source_width": 1264,
         "source_height": 1349,
-        "url_expires_at": null,
+        "url_expires_at": "2030-01-01T00:00:00Z",
         "verification": "not_checked",
         "index": 3
       },
       {
-        "url": "https://media.example.com/image-4.jpg",
+        "url": "https://parser.example.com/api/v1/media/synthetic-resource?exp=1893456000&sig=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "source_width": 4096,
         "source_height": 5461,
-        "url_expires_at": null,
+        "url_expires_at": "2030-01-01T00:00:00Z",
         "verification": "not_checked",
         "index": 4
       }

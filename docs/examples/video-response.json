@@ -7,10 +7,10 @@
     "images": [],
     "videos": [
       {
-        "url": "https://media.example.com/cat.mp4",
+        "url": "https://parser.example.com/api/v1/media/synthetic-resource?exp=1893456000&sig=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "source_width": 720,
         "source_height": 1280,
-        "url_expires_at": null,
+        "url_expires_at": "2030-01-01T00:00:00Z",
         "verification": "not_checked",
         "format": "mp4",
         "codec": "H264",
@@ -20,10 +20,10 @@
       }
     ],
     "cover": {
-      "url": "https://media.example.com/cat-cover.jpg",
+      "url": "https://parser.example.com/api/v1/media/synthetic-resource?exp=1893456000&sig=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "source_width": 1440,
       "source_height": 1920,
-      "url_expires_at": null,
+      "url_expires_at": "2030-01-01T00:00:00Z",
       "verification": "not_checked"
     }
   },

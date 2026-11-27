@@ -12,9 +12,12 @@ from fastapi import FastAPI, Request
 from starlette.responses import Response
 
 from app.api.error_handlers import error_response, install_error_handlers
+from app.api.media_routes import MediaService
+from app.api.media_routes import router as media_router
 from app.api.routes import router
 from app.config import Settings
 from app.errors import AppError
+from app.services.media_tickets import MediaTickets
 from app.services.parse_service import ParseService
 
 MAX_REQUEST_BYTES = 8 * 1024
@@ -32,7 +35,7 @@ def create_app(
     configure_logging()
     resolved_settings = settings or Settings.from_env()
     app = FastAPI(
-        title="小红书与抖音媒体解析 API",
+        title="统一 VPS 媒体解析与中转 API",
         version="0.1.0",
         docs_url=None,
         redoc_url=None,
@@ -40,6 +43,8 @@ def create_app(
     )
     app.state.settings = resolved_settings
     app.state.parse_service = parse_service or ParseService(resolved_settings)
+    app.state.media_tickets = MediaTickets(resolved_settings)
+    app.state.media_service = MediaService(resolved_settings)
 
     @app.middleware("http")
     async def request_boundary(
@@ -54,7 +59,9 @@ def create_app(
                 "event": "request_complete",
                 "request_id": request.state.request_id,
                 "method": request.method,
-                "path": request.url.path,
+                "path": "/api/v1/media/:resource"
+                if request.url.path.startswith("/api/v1/media/")
+                else request.url.path,
                 "status": response.status_code,
                 "duration_ms": round((time.monotonic() - started) * 1000, 2),
                 "outcome_code": getattr(request.state, "outcome_code", "OK"),
@@ -129,4 +136,5 @@ def create_app(
 
     install_error_handlers(app)
     app.include_router(router)
+    app.include_router(media_router)
     return app

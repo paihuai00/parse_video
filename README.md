@@ -1,8 +1,10 @@
-# 小红书与抖音媒体解析 API
+# 统一 VPS 媒体解析与中转 API
 
-这是一个可部署在单台 VPS 上的小流量 JSON API。统一入口接收一条受支持的小红书或抖音链接，服务匿名解析页面并返回完整有序正文图片，或普通视频的一个 MP4 直链及其独立封面。旧小红书入口保留原有图文、视频和 Live Photo 行为。媒体文件由调用方直接从上游 CDN 下载，本服务不代理、保存或转码媒体。
+统一入口 `POST /api/v1/parse` 识别小红书、抖音、B站或既有通用分享链接。小红书保持现有匿名自解析；抖音在 VPS 内依次请求 bugpk `/douyin`、`/dyjx`、ifphp `/svparse`、bugpk `/short_videos`；B站使用 `/bilibili`、`/short_videos`；通用路径只调用固定 `/short_videos`。不接受客户端指定提供方，不新增原生抖音兜底。
 
-抖音真实验证中，两条普通视频样本和一条静态图文样本在新的匿名无头浏览器上下文中自动解析成功，代表 MP4 与 WebP 均由独立 HTTP 会话读取 1024 字节并核对文件头；第四条样本的图片槽位带 2.033 秒动态 MP4，按首版范围返回 `UNSUPPORTED_CONTENT`。样本结论和容器结果见 [抖音实现验收](docs/douyin/implementation-evidence-2026-10-20.md)。
+开启 `MEDIA_PUBLICATION_ENABLED=true` 后，响应中的图片、视频、动态 MP4 和封面 `url` 直接返回 `MEDIA_PUBLIC_ORIGIN` 下的短期中转地址。客户端直接 GET，不需要额外申请下载地址。VPS 实时转发媒体，不保存完整文件或转码。默认关闭该开关用于分阶段上线；新客户端在关闭期间不得直接下载 CDN URL。
+
+完整配置、兼容和上线门槛见 [统一解析与媒体中转](docs/unified-vps-media.md)。本次实现只进行离线验证；第三方接口在实际 VPS 上的可达性、CDN完整文件及微信真机预览/相册行为尚未验证。原生抖音历史验收见 [原生抖音实现验收](docs/douyin/implementation-evidence-2026-10-20.md)，不代表迁移后的第三方链路已验收。
 
 ## 快速开始
 
@@ -32,7 +34,7 @@ curl --request POST http://127.0.0.1:8000/api/v1/parse \
   --data '{"url":"<完整小红书或抖音分享链接>","refresh":false}'
 ```
 
-旧调用方可继续使用 `POST /api/v1/xiaohongshu/parse`。成功响应中的 `images[].url`、可选的 `images[].live_video.url` 或 `videos[0].url` 是临时直链。普通图片省略 `live_video`；小红书 Live Photo 的静态图和动态 MP4 保持在同一个图片项中。抖音动态图片首版明确拒绝，避免静默丢失运动部分。
+旧调用方可继续使用 `POST /api/v1/xiaohongshu/parse`。开启发布开关后，成功响应中的 `images[].url`、可选的 `images[].live_video.url`、`videos[0].url` 和 `cover.url` 是自有域名下可重复使用的临时中转地址。普通图片省略 `live_video`；小红书 Live Photo 的静态图和动态 MP4 保持在同一个图片项中。第三方抖音动态图片必须保留完整图片槽位与动态视频配对；不完整或未知的动态结构拒绝为静态图成功。
 
 ### 在 Postman 中下载抖音视频
 
@@ -52,7 +54,7 @@ docker compose build
 docker compose up -d
 ```
 
-Compose 默认只绑定 `127.0.0.1:8000`，以 UID/GID `10001`、单 Uvicorn worker、只读文件系统运行。抖音普通视频优先在匿名 HTTP 会话中读取移动分享页。镜像中的 Chromium 供抖音图文和有限回退使用，浏览器任务使用独立进程、匿名上下文和沙箱。其临时文件位于有界的 `/tmp` 或 `/home/app`。公网接入示例见 `deploy/nginx.conf.example`。
+Compose 默认只绑定 `127.0.0.1:8000`，以 UID/GID `10001`、单 Uvicorn worker、只读文件系统运行。当前统一接口在服务端调用第三方抖音链。仓库保留的原生抖音代码及 Chromium 依赖与统一入口隔离，不会被静默接入新的兜底。其临时文件位于有界的 `/tmp` 或 `/home/app`。公网接入示例见 `deploy/nginx.conf.example`。
 
 2026-10-20 的本机 Docker Desktop `linux/arm64` 验收确认了缺失/空生产密钥会启动失败、容器健康检查通过，并且 512 MiB 内存、256 PID、只读根、64 MiB `/tmp`、16 MiB 非 root HOME 与 `json-file` 日志轮转配置已应用。受限容器内的抖音真实请求成功，但内存发生上限回收，因此生产保持浏览器并发 1 并在目标 VPS 复测。该结果不替代目标 VPS 验收。
 
@@ -84,8 +86,8 @@ XHS_API_KEY="$XHS_API_KEY" python -m scripts.probe '<小红书或抖音链接>'
 - 解压后的 HTML 上限 2 MiB；总时限 20 秒，连接时限 5 秒。
 - 成功缓存默认 120 秒、最多 256 条；每密钥每分钟 20 次；最多两个上游任务和四个等待者。
 - 支持图文中的 Live Photo：静态图保留原顺序，动态 MP4 放在对应图片的 `live_video`；缺少受支持动态 MP4 时失败，不返回残缺的静态结果。
-- 不支持账号登录、调用方 Cookie、验证码绕过、直播、未知混合媒体、批量解析、媒体代理或永久存储。
-- 抖音首版支持普通视频与静态图文；图片槽位带动态 MP4 的作品返回 `UNSUPPORTED_CONTENT`。
+- 不支持账号登录、调用方 Cookie、验证码绕过、直播、未知混合媒体、批量解析、永久媒体存储或转码。
+- 原生抖音历史代码仍拒绝动态图文；当前第三方链以独立适配支持配对动态视频，实际来源可用性仍须验收。
 
 ## 文档
 

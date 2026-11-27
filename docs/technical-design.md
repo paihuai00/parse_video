@@ -1,3 +1,5 @@
+> Historical native acquisition design/plan. Current unified-provider and media delivery behavior is defined in [unified-vps-media.md](unified-vps-media.md); prior no-proxy/native-Douyin-only scope below does not apply to the migrated unified route.
+
 # 技术方案与已验证细节
 
 日期：2026-10-20（Asia/Shanghai）。状态：小红书与抖音统一解析已实现并通过离线测试；两平台本地真实网络脱敏探测已完成，目标 VPS 验收待执行。

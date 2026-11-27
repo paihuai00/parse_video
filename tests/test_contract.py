@@ -41,7 +41,19 @@ def test_contract_has_exact_public_routes() -> None:
         "/healthz",
         "/api/v1/parse",
         "/api/v1/xiaohongshu/parse",
+        "/api/v1/media/{resource_id}",
     }
+
+
+def test_checked_in_schemas_and_media_operations_match_runtime() -> None:
+    contract = json.loads((ROOT / "docs/openapi.json").read_text(encoding="utf-8"))
+    runtime = create_app(Settings(api_key="test-key", environment="test")).openapi()
+    assert contract["components"]["schemas"] == runtime["components"]["schemas"]
+    assert (
+        contract["paths"]["/api/v1/media/{resource_id}"]
+        == runtime["paths"]["/api/v1/media/{resource_id}"]
+    )
+    assert "platform" in runtime["components"]["schemas"]["UnifiedImageNote"]["required"]
 
 
 def test_runtime_openapi_keeps_the_structured_optional_live_video_schema() -> None:

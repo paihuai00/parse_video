@@ -16,7 +16,7 @@ from app.parser.media import normalize_mobile_note, normalize_note
 from app.parser.state_reader import decode_initial_state, select_note_layout
 from app.parser.url_rules import cache_key, parse_url
 
-Platform = Literal["xiaohongshu", "douyin"]
+Platform = Literal["xiaohongshu", "douyin", "bilibili", "unknown"]
 
 
 class PageFetcher(Protocol):
@@ -71,11 +71,21 @@ class DouyinAdapter:
 
 
 def detect_platform(raw_url: str) -> Platform:
+    from app.services.media_policy import public_http_parts
+
+    parts = public_http_parts(raw_url)
     if is_douyin_host(raw_url):
         parse_douyin_url(raw_url)
         return "douyin"
-    try:
+    if parts.hostname in {"b23.tv", "bilibili.com", "www.bilibili.com", "m.bilibili.com"}:
+        return "bilibili"
+    if parts.hostname in {
+        "xiaohongshu.com",
+        "www.xiaohongshu.com",
+        "www.rednote.com",
+        "xhslink.com",
+        "xhslink.cn",
+    }:
         parse_url(raw_url)
-    except AppError as exc:
-        raise AppError("INVALID_URL", 400, detail="unsupported platform URL") from exc
-    return "xiaohongshu"
+        return "xiaohongshu"
+    return "unknown"

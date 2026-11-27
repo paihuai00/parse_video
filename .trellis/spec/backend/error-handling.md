@@ -30,3 +30,7 @@ Nonempty missing-state/invalid-JSON pages remain `PARSE_FAILED` without fallback
 short-link emptiness cannot select another strategy. Mobile image motion is only
 returned when both a legal detail still and a positively identified paired MP4
 exist; incomplete or unsupported motion cannot become static-only success.
+
+## Media/publication errors
+
+`MEDIA_TICKET_CAPACITY` is a post-parse publication error, never a provider retry. Expected media failures include machine-readable `X-Media-Error-Code`/`X-Request-ID`; only expired/lost 410 credentials permit one reparse. Unsafe DNS is 403 while transient DNS/transport failure is 502 and deadline failure is 504. After streaming starts, close/abort the response; do not append an envelope. See `docs/unified-vps-media.md` for the code table.

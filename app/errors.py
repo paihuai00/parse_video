@@ -25,9 +25,28 @@ MESSAGES = {
     "UPSTREAM_TIMEOUT": "获取或解析小红书页面超时。",
 }
 
+MESSAGES.update(
+    {
+        "PROVIDER_UNAVAILABLE": "解析来源暂时不可用。",
+        "PROVIDER_ACCESS_DENIED": "解析来源拒绝访问，请检查服务端配置。",
+        "PROVIDER_EXHAUSTED": "解析来源均未返回可用媒体。",
+        "MEDIA_SOURCE_INVALID": "媒体地址不符合要求。",
+        "MEDIA_SOURCE_FORBIDDEN": "媒体来源不受支持。",
+        "MEDIA_TICKET_INVALID": "媒体访问凭证无效。",
+        "MEDIA_TICKET_EXPIRED": "媒体访问凭证已过期，请重新解析。",
+        "MEDIA_TICKET_GONE": "媒体访问凭证已失效，请重新解析。",
+        "MEDIA_TICKET_CAPACITY": "媒体地址签发繁忙，请稍后重试。",
+        "MEDIA_BUSY": "媒体下载繁忙，请稍后重试。",
+        "MEDIA_RATE_LIMITED": "媒体请求过于频繁，请稍后重试。",
+        "MEDIA_UPSTREAM_REJECTED": "媒体来源拒绝了请求。",
+        "MEDIA_UPSTREAM_BAD_RESPONSE": "媒体来源返回了无法使用的文件。",
+        "MEDIA_UPSTREAM_TIMEOUT": "媒体读取超时。",
+    }
+)
+
 UNIFIED_MESSAGES = {
     **MESSAGES,
-    "INVALID_URL": "链接不是受支持的小红书或抖音作品地址。",
+    "INVALID_URL": "链接不是有效的受支持分享地址。",
     "NOTE_NOT_FOUND": "目标作品不存在或已不可见。",
     "UNSUPPORTED_CONTENT": "该作品包含当前版本不支持的媒体类型。",
     "UPSTREAM_BAD_RESPONSE": "内容平台返回了无法处理的响应。",

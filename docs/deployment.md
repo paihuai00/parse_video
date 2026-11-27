@@ -1,3 +1,5 @@
+> Current rollout contract: [Unified VPS media delivery](unified-vps-media.md). The provider migration and media routes are local implementation; old deployment evidence below does not establish this version is live. The publication switch defaults off.
+
 # Docker 部署与验收清单
 
 仓库已提供统一 API、`Dockerfile`、`compose.yaml`、`.env.example` 和 Nginx 示例。Compose 配置、本机 `linux/arm64` 镜像构建和容器运行已通过验收；小红书授权样本及抖音普通视频/静态图文均完成本地脱敏探测。目标 VPS 架构、出口网络及调用方媒体读取仍需部署者按本文执行验收。用户自行在已有 Docker 的 VPS 上部署，无需提供 SSH 密码或服务器密钥。
@@ -9,7 +11,7 @@
 - 固定 `curl_cffi==0.13.0` 和桌面 `XHS_IMPERSONATE=chrome136`，保留 TLS 证书验证。安全详情页跳向同主机精确 `/404` 时，客户端可用固定 `safari184_ios` 做一次匿名移动获取；无需安装 Safari、macOS 或 iOS。不要仅修改环境变量替代完整的移动状态/图片适配；升级库或请求配置仍需重新验证样本。
 - 抖音普通视频优先通过匿名 HTTP 获取移动分享页，读取作品并解析短期 CDN 直链。抖音图文和有限回退使用固定版本的 Playwright 和 Chromium，浏览器继续在沙箱中的独立匿名上下文运行。应用进程仍以 UID/GID 10001 运行。
 - 单进程使用内存缓存、并发限制和有界等待队列，不依赖数据库、Redis 或任务服务。重启清空这些内存状态；增加 worker 会让限流与缓存分裂，不能直接作为扩容办法。
-- API 只返回图片、每张小红书图片可选的 Live Photo 动态 MP4、普通视频主地址及元数据，不代理、保存或转码媒体。调用方直接访问对应平台 CDN。
+- 开启媒体发布开关后，API 返回自有 HTTPS origin 下的图片、动态 MP4、普通视频和封面地址；VPS 流式中转，不保存完整媒体或转码。
 - 本机端口只映射至 VPS 的 `127.0.0.1:8000`，公网入口通过现有 Nginx 提供 HTTPS。
 
 ## 2. 配置约定
@@ -143,7 +145,7 @@ X-API-Key: <部署时设置的密钥>
 
 初次验证保留分享链接的完整查询参数。`refresh:true` 只能跳过结果缓存，不能绕过鉴权、限流、并发或队列限制。具体成功及错误 JSON 以 API 契约文档为准，部署层不另定义一套返回结构。
 
-统一入口支持精确 `v.douyin.com` 短链、`www.douyin.com/video/<id>`、`www.douyin.com/note/<id>` 及 `www.iesdouyin.com/share/{video,note,slides}/<id>`。其中 `slides` 指向同 ID 的图文详情，动态图文仍返回 `UNSUPPORTED_CONTENT`。旧 `POST /api/v1/xiaohongshu/parse` 保留原行为。相似域和其他路径会返回 `INVALID_URL`。
+统一入口支持精确 `v.douyin.com` 短链、`www.douyin.com/video/<id>`、`www.douyin.com/note/<id>` 及 `www.iesdouyin.com/share/{video,note,slides}/<id>`。原生实现的 `slides` 指向同 ID 图文详情且拒绝动态图片；当前统一入口使用第三方链并保留配对动态视频，详见统一中转文档。旧 `POST /api/v1/xiaohongshu/parse` 保留原行为。相似域和其他路径会返回 `INVALID_URL`。
 
 使用 [Postman Collection](postman/parse-video.postman_collection.json) 验收时，先用 `refresh: true` 解析抖音短链，随后从客户端用独立 GET 下载 `data.videos[0].url`。在本地 Postman 环境填写 API 密钥和授权样本链接。
 
@@ -180,7 +182,7 @@ location = /api/v1/parse {
 - 保留应用已返回的错误 JSON，不能用笼统的代理错误页覆盖更明确的上游失败原因。
 - 只信任实际受控的代理链；如按来源 IP 限流，由 Nginx 与应用共同配置可信代理，不直接信任调用方伪造的 `X-Forwarded-For`。
 - 不记录 `X-API-Key`、完整分享令牌或签名媒体 URL；使用请求编号关联代理与应用日志。
-- 不新增媒体代理路由。图片和视频地址由调用方自行使用，跨域或下载权限问题不会因 API 使用 HTTPS 自动消失。
+- 新增 GET/HEAD `/api/v1/media/{resource_id}`，配置流式转发与安全日志；不能把请求重定向回原 CDN。微信后台仍需配置自有 request/downloadFile 合法域名。
 
 修改后先运行 `nginx -t`，检查通过再按现有部署方式 reload；不直接替换全局配置或重启其他站点。
 

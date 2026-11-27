@@ -1,0 +1,921 @@
+{
+  "info": {
+    "name": "统一解析与媒体中转：本地真实样本",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Local service on 127.0.0.1:8001. Run each folder in order: parse then GET media. Local-only adapter rewrites the configured HTTPS localhost origin to baseUrl. No production TLS or WeChat-domain claim. Reparse after server restart or ticket expiry."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8001"
+    },
+    {
+      "key": "apiKey",
+      "value": "local-test-key"
+    }
+  ],
+  "item": [
+    {
+      "name": "健康检查",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/healthz"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"健康检查\", () => { pm.response.to.have.status(200); pm.expect(pm.response.json().status).to.equal(\"ok\"); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "dy1 挖挖",
+      "item": [
+        {
+          "name": "解析：挖挖",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/parse",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://v.douyin.com/3H7Xd8xdGfg/\",\n  \"refresh\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test(\"解析成功\", () => { pm.response.to.have.status(200); pm.expect(body.success).to.equal(true); });",
+                  "const d=body.data; if (!d) throw new Error(\"No parsed data\");",
+                  "const media={};",
+                  "d.images.forEach((m,i)=>{ media[`image-${i+1}`]=m.url; if(m.live_video) media[`motion-${i+1}`]=m.live_video.url; });",
+                  "d.videos.forEach((m,i)=>{ media[`video-${i+1}`]=m.url; });",
+                  "if(d.cover) media.cover=d.cover.url;",
+                  "if(d.author?.avatar) media.avatar=d.author.avatar;",
+                  "pm.test(\"完整媒体数量\", () => pm.expect(Object.keys(media).length).to.equal(2));",
+                  "Object.entries(media).forEach(([role,url])=>{",
+                  "  pm.test(\"自有媒体入口: \"+role,()=>pm.expect(url).to.match(/^https:\\/\\/localhost\\/api\\/v1\\/media\\//));",
+                  "  pm.collectionVariables.set(\"dy1-\"+role, url.replace(/^https:\\/\\/localhost(?=\\/)/,pm.variables.get(\"baseUrl\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "下载：video-1",
+          "request": {
+            "method": "GET",
+            "url": "{{dy1-video-1}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"完整文件 HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"文件类型\",()=>pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"video/\"));",
+                  "pm.test(\"文件体及长度\",()=>{ const n=pm.response.stream.length; pm.expect(n).to.be.above(12); const declared=pm.response.headers.get(\"Content-Length\"); if(declared) pm.expect(n).to.equal(Number(declared)); });",
+                  "pm.test(\"MP4 文件头\",()=>{const b=pm.response.stream; pm.expect(String.fromCharCode(...b.slice(4,8))).to.equal(\"ftyp\");});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "下载：cover",
+          "request": {
+            "method": "GET",
+            "url": "{{dy1-cover}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"完整文件 HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"文件类型\",()=>pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"image/\"));",
+                  "pm.test(\"文件体及长度\",()=>{ const n=pm.response.stream.length; pm.expect(n).to.be.above(12); const declared=pm.response.headers.get(\"Content-Length\"); if(declared) pm.expect(n).to.equal(Number(declared)); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "dy2 极目新闻",
+      "item": [
+        {
+          "name": "解析：极目新闻",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/parse",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://v.douyin.com/QvqSJKtAXLQ/\",\n  \"refresh\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test(\"解析成功\", () => { pm.response.to.have.status(200); pm.expect(body.success).to.equal(true); });",
+                  "const d=body.data; if (!d) throw new Error(\"No parsed data\");",
+                  "const media={};",
+                  "d.images.forEach((m,i)=>{ media[`image-${i+1}`]=m.url; if(m.live_video) media[`motion-${i+1}`]=m.live_video.url; });",
+                  "d.videos.forEach((m,i)=>{ media[`video-${i+1}`]=m.url; });",
+                  "if(d.cover) media.cover=d.cover.url;",
+                  "if(d.author?.avatar) media.avatar=d.author.avatar;",
+                  "pm.test(\"完整媒体数量\", () => pm.expect(Object.keys(media).length).to.equal(2));",
+                  "Object.entries(media).forEach(([role,url])=>{",
+                  "  pm.test(\"自有媒体入口: \"+role,()=>pm.expect(url).to.match(/^https:\\/\\/localhost\\/api\\/v1\\/media\\//));",
+                  "  pm.collectionVariables.set(\"dy2-\"+role, url.replace(/^https:\\/\\/localhost(?=\\/)/,pm.variables.get(\"baseUrl\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "下载：video-1",
+          "request": {
+            "method": "GET",
+            "url": "{{dy2-video-1}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"完整文件 HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"文件类型\",()=>pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"video/\"));",
+                  "pm.test(\"文件体及长度\",()=>{ const n=pm.response.stream.length; pm.expect(n).to.be.above(12); const declared=pm.response.headers.get(\"Content-Length\"); if(declared) pm.expect(n).to.equal(Number(declared)); });",
+                  "pm.test(\"MP4 文件头\",()=>{const b=pm.response.stream; pm.expect(String.fromCharCode(...b.slice(4,8))).to.equal(\"ftyp\");});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "下载：cover",
+          "request": {
+            "method": "GET",
+            "url": "{{dy2-cover}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"完整文件 HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"文件类型\",()=>pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"image/\"));",
+                  "pm.test(\"文件体及长度\",()=>{ const n=pm.response.stream.length; pm.expect(n).to.be.above(12); const declared=pm.response.headers.get(\"Content-Length\"); if(declared) pm.expect(n).to.equal(Number(declared)); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "dy3 二手工程机械Lucy",
+      "item": [
+        {
+          "name": "解析：二手工程机械Lucy",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/parse",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://v.douyin.com/yfv7UaDSJNw/\",\n  \"refresh\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test(\"解析成功\", () => { pm.response.to.have.status(200); pm.expect(body.success).to.equal(true); });",
+                  "const d=body.data; if (!d) throw new Error(\"No parsed data\");",
+                  "const media={};",
+                  "d.images.forEach((m,i)=>{ media[`image-${i+1}`]=m.url; if(m.live_video) media[`motion-${i+1}`]=m.live_video.url; });",
+                  "d.videos.forEach((m,i)=>{ media[`video-${i+1}`]=m.url; });",
+                  "if(d.cover) media.cover=d.cover.url;",
+                  "if(d.author?.avatar) media.avatar=d.author.avatar;",
+                  "pm.test(\"完整媒体数量\", () => pm.expect(Object.keys(media).length).to.equal(2));",
+                  "Object.entries(media).forEach(([role,url])=>{",
+                  "  pm.test(\"自有媒体入口: \"+role,()=>pm.expect(url).to.match(/^https:\\/\\/localhost\\/api\\/v1\\/media\\//));",
+                  "  pm.collectionVariables.set(\"dy3-\"+role, url.replace(/^https:\\/\\/localhost(?=\\/)/,pm.variables.get(\"baseUrl\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "下载：video-1",
+          "request": {
+            "method": "GET",
+            "url": "{{dy3-video-1}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"完整文件 HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"文件类型\",()=>pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"video/\"));",
+                  "pm.test(\"文件体及长度\",()=>{ const n=pm.response.stream.length; pm.expect(n).to.be.above(12); const declared=pm.response.headers.get(\"Content-Length\"); if(declared) pm.expect(n).to.equal(Number(declared)); });",
+                  "pm.test(\"MP4 文件头\",()=>{const b=pm.response.stream; pm.expect(String.fromCharCode(...b.slice(4,8))).to.equal(\"ftyp\");});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "下载：cover",
+          "request": {
+            "method": "GET",
+            "url": "{{dy3-cover}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"完整文件 HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"文件类型\",()=>pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"image/\"));",
+                  "pm.test(\"文件体及长度\",()=>{ const n=pm.response.stream.length; pm.expect(n).to.be.above(12); const declared=pm.response.headers.get(\"Content-Length\"); if(declared) pm.expect(n).to.equal(Number(declared)); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "xhs1 GitHub飙升榜",
+      "item": [
+        {
+          "name": "解析：GitHub飙升榜",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/parse",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://xhslink.cn/o/6EOP50f0cGF\",\n  \"refresh\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test(\"解析成功\", () => { pm.response.to.have.status(200); pm.expect(body.success).to.equal(true); });",
+                  "const d=body.data; if (!d) throw new Error(\"No parsed data\");",
+                  "const media={};",
+                  "d.images.forEach((m,i)=>{ media[`image-${i+1}`]=m.url; if(m.live_video) media[`motion-${i+1}`]=m.live_video.url; });",
+                  "d.videos.forEach((m,i)=>{ media[`video-${i+1}`]=m.url; });",
+                  "if(d.cover) media.cover=d.cover.url;",
+                  "if(d.author?.avatar) media.avatar=d.author.avatar;",
+                  "pm.test(\"完整媒体数量\", () => pm.expect(Object.keys(media).length).to.equal(13));",
+                  "Object.entries(media).forEach(([role,url])=>{",
+                  "  pm.test(\"自有媒体入口: \"+role,()=>pm.expect(url).to.match(/^https:\\/\\/localhost\\/api\\/v1\\/media\\//));",
+                  "  pm.collectionVariables.set(\"xhs1-\"+role, url.replace(/^https:\\/\\/localhost(?=\\/)/,pm.variables.get(\"baseUrl\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "下载：image-1",
+          "request": {
+            "method": "GET",
+            "url": "{{xhs1-image-1}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"完整文件 HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"文件类型\",()=>pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"image/\"));",
+                  "pm.test(\"文件体及长度\",()=>{ const n=pm.response.stream.length; pm.expect(n).to.be.above(12); const declared=pm.response.headers.get(\"Content-Length\"); if(declared) pm.expect(n).to.equal(Number(declared)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "下载：image-2",
+          "request": {
+            "method": "GET",
+            "url": "{{xhs1-image-2}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"完整文件 HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"文件类型\",()=>pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"image/\"));",
+                  "pm.test(\"文件体及长度\",()=>{ const n=pm.response.stream.length; pm.expect(n).to.be.above(12); const declared=pm.response.headers.get(\"Content-Length\"); if(declared) pm.expect(n).to.equal(Number(declared)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "下载：image-3",
+          "request": {
+            "method": "GET",
+            "url": "{{xhs1-image-3}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"完整文件 HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"文件类型\",()=>pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"image/\"));",
+                  "pm.test(\"文件体及长度\",()=>{ const n=pm.response.stream.length; pm.expect(n).to.be.above(12); const declared=pm.response.headers.get(\"Content-Length\"); if(declared) pm.expect(n).to.equal(Number(declared)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "下载：image-4",
+          "request": {
+            "method": "GET",
+            "url": "{{xhs1-image-4}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"完整文件 HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"文件类型\",()=>pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"image/\"));",
+                  "pm.test(\"文件体及长度\",()=>{ const n=pm.response.stream.length; pm.expect(n).to.be.above(12); const declared=pm.response.headers.get(\"Content-Length\"); if(declared) pm.expect(n).to.equal(Number(declared)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "下载：image-5",
+          "request": {
+            "method": "GET",
+            "url": "{{xhs1-image-5}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"完整文件 HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"文件类型\",()=>pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"image/\"));",
+                  "pm.test(\"文件体及长度\",()=>{ const n=pm.response.stream.length; pm.expect(n).to.be.above(12); const declared=pm.response.headers.get(\"Content-Length\"); if(declared) pm.expect(n).to.equal(Number(declared)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "下载：image-6",
+          "request": {
+            "method": "GET",
+            "url": "{{xhs1-image-6}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"完整文件 HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"文件类型\",()=>pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"image/\"));",
+                  "pm.test(\"文件体及长度\",()=>{ const n=pm.response.stream.length; pm.expect(n).to.be.above(12); const declared=pm.response.headers.get(\"Content-Length\"); if(declared) pm.expect(n).to.equal(Number(declared)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "下载：image-7",
+          "request": {
+            "method": "GET",
+            "url": "{{xhs1-image-7}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"完整文件 HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"文件类型\",()=>pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"image/\"));",
+                  "pm.test(\"文件体及长度\",()=>{ const n=pm.response.stream.length; pm.expect(n).to.be.above(12); const declared=pm.response.headers.get(\"Content-Length\"); if(declared) pm.expect(n).to.equal(Number(declared)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "下载：image-8",
+          "request": {
+            "method": "GET",
+            "url": "{{xhs1-image-8}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"完整文件 HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"文件类型\",()=>pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"image/\"));",
+                  "pm.test(\"文件体及长度\",()=>{ const n=pm.response.stream.length; pm.expect(n).to.be.above(12); const declared=pm.response.headers.get(\"Content-Length\"); if(declared) pm.expect(n).to.equal(Number(declared)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "下载：image-9",
+          "request": {
+            "method": "GET",
+            "url": "{{xhs1-image-9}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"完整文件 HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"文件类型\",()=>pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"image/\"));",
+                  "pm.test(\"文件体及长度\",()=>{ const n=pm.response.stream.length; pm.expect(n).to.be.above(12); const declared=pm.response.headers.get(\"Content-Length\"); if(declared) pm.expect(n).to.equal(Number(declared)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "下载：image-10",
+          "request": {
+            "method": "GET",
+            "url": "{{xhs1-image-10}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"完整文件 HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"文件类型\",()=>pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"image/\"));",
+                  "pm.test(\"文件体及长度\",()=>{ const n=pm.response.stream.length; pm.expect(n).to.be.above(12); const declared=pm.response.headers.get(\"Content-Length\"); if(declared) pm.expect(n).to.equal(Number(declared)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "下载：image-11",
+          "request": {
+            "method": "GET",
+            "url": "{{xhs1-image-11}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"完整文件 HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"文件类型\",()=>pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"image/\"));",
+                  "pm.test(\"文件体及长度\",()=>{ const n=pm.response.stream.length; pm.expect(n).to.be.above(12); const declared=pm.response.headers.get(\"Content-Length\"); if(declared) pm.expect(n).to.equal(Number(declared)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "下载：image-12",
+          "request": {
+            "method": "GET",
+            "url": "{{xhs1-image-12}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"完整文件 HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"文件类型\",()=>pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"image/\"));",
+                  "pm.test(\"文件体及长度\",()=>{ const n=pm.response.stream.length; pm.expect(n).to.be.above(12); const declared=pm.response.headers.get(\"Content-Length\"); if(declared) pm.expect(n).to.equal(Number(declared)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "下载：image-13",
+          "request": {
+            "method": "GET",
+            "url": "{{xhs1-image-13}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"完整文件 HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"文件类型\",()=>pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"image/\"));",
+                  "pm.test(\"文件体及长度\",()=>{ const n=pm.response.stream.length; pm.expect(n).to.be.above(12); const declared=pm.response.headers.get(\"Content-Length\"); if(declared) pm.expect(n).to.equal(Number(declared)); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "xhs2 撒娇的噜噜",
+      "item": [
+        {
+          "name": "解析：撒娇的噜噜",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/parse",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://xhslink.cn/o/15ADq9K1g6\",\n  \"refresh\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test(\"解析成功\", () => { pm.response.to.have.status(200); pm.expect(body.success).to.equal(true); });",
+                  "const d=body.data; if (!d) throw new Error(\"No parsed data\");",
+                  "const media={};",
+                  "d.images.forEach((m,i)=>{ media[`image-${i+1}`]=m.url; if(m.live_video) media[`motion-${i+1}`]=m.live_video.url; });",
+                  "d.videos.forEach((m,i)=>{ media[`video-${i+1}`]=m.url; });",
+                  "if(d.cover) media.cover=d.cover.url;",
+                  "if(d.author?.avatar) media.avatar=d.author.avatar;",
+                  "pm.test(\"完整媒体数量\", () => pm.expect(Object.keys(media).length).to.equal(2));",
+                  "Object.entries(media).forEach(([role,url])=>{",
+                  "  pm.test(\"自有媒体入口: \"+role,()=>pm.expect(url).to.match(/^https:\\/\\/localhost\\/api\\/v1\\/media\\//));",
+                  "  pm.collectionVariables.set(\"xhs2-\"+role, url.replace(/^https:\\/\\/localhost(?=\\/)/,pm.variables.get(\"baseUrl\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "下载：video-1",
+          "request": {
+            "method": "GET",
+            "url": "{{xhs2-video-1}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"完整文件 HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"文件类型\",()=>pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"video/\"));",
+                  "pm.test(\"文件体及长度\",()=>{ const n=pm.response.stream.length; pm.expect(n).to.be.above(12); const declared=pm.response.headers.get(\"Content-Length\"); if(declared) pm.expect(n).to.equal(Number(declared)); });",
+                  "pm.test(\"MP4 文件头\",()=>{const b=pm.response.stream; pm.expect(String.fromCharCode(...b.slice(4,8))).to.equal(\"ftyp\");});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "下载：cover",
+          "request": {
+            "method": "GET",
+            "url": "{{xhs2-cover}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"完整文件 HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"文件类型\",()=>pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"image/\"));",
+                  "pm.test(\"文件体及长度\",()=>{ const n=pm.response.stream.length; pm.expect(n).to.be.above(12); const declared=pm.response.headers.get(\"Content-Length\"); if(declared) pm.expect(n).to.equal(Number(declared)); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "xhs3 我知道你贵",
+      "item": [
+        {
+          "name": "解析：我知道你贵",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/parse",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://xhslink.cn/o/2ti8G1HRgjE\",\n  \"refresh\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test(\"解析成功\", () => { pm.response.to.have.status(200); pm.expect(body.success).to.equal(true); });",
+                  "const d=body.data; if (!d) throw new Error(\"No parsed data\");",
+                  "const media={};",
+                  "d.images.forEach((m,i)=>{ media[`image-${i+1}`]=m.url; if(m.live_video) media[`motion-${i+1}`]=m.live_video.url; });",
+                  "d.videos.forEach((m,i)=>{ media[`video-${i+1}`]=m.url; });",
+                  "if(d.cover) media.cover=d.cover.url;",
+                  "if(d.author?.avatar) media.avatar=d.author.avatar;",
+                  "pm.test(\"完整媒体数量\", () => pm.expect(Object.keys(media).length).to.equal(2));",
+                  "Object.entries(media).forEach(([role,url])=>{",
+                  "  pm.test(\"自有媒体入口: \"+role,()=>pm.expect(url).to.match(/^https:\\/\\/localhost\\/api\\/v1\\/media\\//));",
+                  "  pm.collectionVariables.set(\"xhs3-\"+role, url.replace(/^https:\\/\\/localhost(?=\\/)/,pm.variables.get(\"baseUrl\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "下载：video-1",
+          "request": {
+            "method": "GET",
+            "url": "{{xhs3-video-1}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"完整文件 HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"文件类型\",()=>pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"video/\"));",
+                  "pm.test(\"文件体及长度\",()=>{ const n=pm.response.stream.length; pm.expect(n).to.be.above(12); const declared=pm.response.headers.get(\"Content-Length\"); if(declared) pm.expect(n).to.equal(Number(declared)); });",
+                  "pm.test(\"MP4 文件头\",()=>{const b=pm.response.stream; pm.expect(String.fromCharCode(...b.slice(4,8))).to.equal(\"ftyp\");});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "下载：cover",
+          "request": {
+            "method": "GET",
+            "url": "{{xhs3-cover}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"完整文件 HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"文件类型\",()=>pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"image/\"));",
+                  "pm.test(\"文件体及长度\",()=>{ const n=pm.response.stream.length; pm.expect(n).to.be.above(12); const declared=pm.response.headers.get(\"Content-Length\"); if(declared) pm.expect(n).to.equal(Number(declared)); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "xhs4 你们就宠它吧",
+      "item": [
+        {
+          "name": "解析：你们就宠它吧",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/parse",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://xhslink.cn/o/ARUVKPt2J50\",\n  \"refresh\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test(\"解析成功\", () => { pm.response.to.have.status(200); pm.expect(body.success).to.equal(true); });",
+                  "const d=body.data; if (!d) throw new Error(\"No parsed data\");",
+                  "const media={};",
+                  "d.images.forEach((m,i)=>{ media[`image-${i+1}`]=m.url; if(m.live_video) media[`motion-${i+1}`]=m.live_video.url; });",
+                  "d.videos.forEach((m,i)=>{ media[`video-${i+1}`]=m.url; });",
+                  "if(d.cover) media.cover=d.cover.url;",
+                  "if(d.author?.avatar) media.avatar=d.author.avatar;",
+                  "pm.test(\"完整媒体数量\", () => pm.expect(Object.keys(media).length).to.equal(2));",
+                  "Object.entries(media).forEach(([role,url])=>{",
+                  "  pm.test(\"自有媒体入口: \"+role,()=>pm.expect(url).to.match(/^https:\\/\\/localhost\\/api\\/v1\\/media\\//));",
+                  "  pm.collectionVariables.set(\"xhs4-\"+role, url.replace(/^https:\\/\\/localhost(?=\\/)/,pm.variables.get(\"baseUrl\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "下载：video-1",
+          "request": {
+            "method": "GET",
+            "url": "{{xhs4-video-1}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"完整文件 HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"文件类型\",()=>pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"video/\"));",
+                  "pm.test(\"文件体及长度\",()=>{ const n=pm.response.stream.length; pm.expect(n).to.be.above(12); const declared=pm.response.headers.get(\"Content-Length\"); if(declared) pm.expect(n).to.equal(Number(declared)); });",
+                  "pm.test(\"MP4 文件头\",()=>{const b=pm.response.stream; pm.expect(String.fromCharCode(...b.slice(4,8))).to.equal(\"ftyp\");});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "下载：cover",
+          "request": {
+            "method": "GET",
+            "url": "{{xhs4-cover}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"完整文件 HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"文件类型\",()=>pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"image/\"));",
+                  "pm.test(\"文件体及长度\",()=>{ const n=pm.response.stream.length; pm.expect(n).to.be.above(12); const declared=pm.response.headers.get(\"Content-Length\"); if(declared) pm.expect(n).to.equal(Number(declared)); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

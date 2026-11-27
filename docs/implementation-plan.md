@@ -1,3 +1,5 @@
+> Historical native acquisition design/plan. Current unified-provider and media delivery behavior is defined in [unified-vps-media.md](unified-vps-media.md); prior no-proxy/native-Douyin-only scope below does not apply to the migrated unified route.
+
 # 实施拆分与验收清单
 
 状态日期：2026-11-05。小红书移动页修复已完成本地代码和 Python 3.12 离线验证，授权短链/长链通过完整本地 API 链路并取得有效图片。用户转述的 VPS 报告只验证了修复前的移动页获取，本次候选版本的 VPS 媒体、完整 API 和调用方验收仍待执行。以下历史 Docker、抖音记录保留原验证范围。

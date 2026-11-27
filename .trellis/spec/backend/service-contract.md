@@ -1,12 +1,24 @@
 # Service Contract
 
-## Scenario: Parse one Xiaohongshu or Douyin work into temporary media direct URLs
+## Scenario: Unified provider parsing and temporary VPS media delivery
 
 ### 1. Scope / Trigger
 
-Use this contract whenever code changes the HTTP API, platform detection, upstream URL/transport policy, note parsing, media normalization, process-local resource controls, browser acquisition, environment wiring, or deployment proxy. These layers form one observable contract: the caller submits one work URL, the service returns JSON direct URLs, and the caller downloads from the upstream CDN.
+Use this contract whenever code changes the HTTP API, platform detection, upstream URL/transport policy, note parsing, media normalization, process-local resource controls, browser acquisition, environment wiring, or deployment proxy. These layers form one observable contract: the caller submits one share URL to `/api/v1/parse`, and the VPS owns provider dispatch and media publication. Current migrated behavior is defined in [unified-vps-media.md](../../../docs/unified-vps-media.md). XHS uses unchanged self-acquisition. Douyin uses the fixed bugpk/ifphp provider chain; Bilibili and generic use fixed providers. The native Douyin details below describe isolated legacy acquisition, not a fallback of the migrated unified route.
 
-The service never proxies, stores, bundles, transcodes, or streams media files. Xiaohongshu per-image Live Photo MP4 discovery is supported. Douyin supports normal video and complete ordered static image works; a Douyin image slot with a motion video fails as `UNSUPPORTED_CONTENT` instead of losing the motion part. Live broadcasts, unrelated mixed top-level media, login sessions, batch input, and multiple workers remain outside v1.
+With `MEDIA_PUBLICATION_ENABLED=true`, all exposed image/video/motion/cover URLs use the configured HTTPS public origin. Raw CDN strings stay in internal cache; each response atomically registers fresh reusable credentials. Count/bytes are bounded without evicting valid records. No ticket POST, persistent media storage, Redis, transcoding, or multiple workers. The rollout switch defaults off for server-first deployment; new clients must not directly save raw CDN output.
+
+### Current media and provider invariants
+
+- Unified results have explicit `platform=xhs|douyin|bilibili|unknown`, nullable unverified provider `note_id`, title/desc/author name. Optional avatars that pass the existing media image policy are atomically proxied; unsupported avatars are omitted. Audio is not exposed. Legacy XHS IDs remain strict.
+- Motion must stay on its owning image for every provider including generic fallback. Unknown/incomplete dynamic layouts fail instead of still-only success.
+- Media publication is outside provider retry/fallback. A signing capacity failure must not retry parsing or change provider preference.
+- GET/HEAD `/api/v1/media/{resource_id}?exp=...&sig=...` authenticate via a reusable URL capability. Full GET is 200; Range is ignored; upstream partial responses are rejected. HEAD never fabricates length.
+- Separate media host/type policy from XHS page acquisition: preserve the existing page allowlist. Every media hop uses public DNS checks, pinned vetted IPs, original Host/TLS identity, and raw signed targets. Bounded numbered media namespaces are explicit in `media_policy.py`; lookalikes and private IPs fail closed.
+- Pull-based httpcore 1.0.8 transport has no background response queue. One disconnect watcher covers queue/connect/preflight/stream; cancellation closes and awaits the source before releasing admission. Independent download time/byte/rate/queue limits apply.
+- Only 410 `MEDIA_TICKET_EXPIRED`/`MEDIA_TICKET_GONE` permits one client reparse. Other errors are distinguished using status plus `X-Media-Error-Code`/`X-Request-ID`. Streaming failures interrupt the connection, never append JSON.
+- `url_expires_at` describes the VPS credential, not source validity. `verification=not_checked` and parse-cache metadata retain distinct meanings. Never log capability IDs, signed URLs, raw providers or secrets.
+- Current wire, cancellation, capacity and provider evidence is synthetic/offline. Actual VPS third-party/CDN reachability, full file saves and device HEAD/Range needs remain release gates.
 
 ### 2. Signatures
 
@@ -42,7 +54,7 @@ class ParseService:
         raw_url: str,
         refresh: bool,
         api_key: str,
-        platform: Literal["xiaohongshu", "douyin"] = "xiaohongshu",
+        platform: Literal["xiaohongshu", "douyin", "bilibili", "unknown"] = "xiaohongshu",
     ) -> ServiceResult: ...
 
 class XiaohongshuClient:

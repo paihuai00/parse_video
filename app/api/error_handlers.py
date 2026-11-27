@@ -33,6 +33,8 @@ def error_response(request: Request, error: AppError) -> JSONResponse:
         meta=ResponseMeta(request_id=request_id(request), parsed_at=None, cache=None),
     )
     headers = {"X-Request-ID": request_id(request)}
+    if error.code.startswith("MEDIA_"):
+        headers["X-Media-Error-Code"] = error.code
     if error.retry_after is not None:
         headers["Retry-After"] = str(error.retry_after)
     return JSONResponse(

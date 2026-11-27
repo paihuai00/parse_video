@@ -22,8 +22,7 @@ deploy/                   # additive deployment examples
 - `ParseService` composes limits, cache, in-flight work, the client, and parser functions.
 - `parser/url_rules.py` owns upstream page URL and DNS rules.
 - `parser/media.py` owns CDN URL and media selection rules.
-- Media URLs are accepted only from the exact CDN hosts backed by sanitized evidence and
-  regression tests. A new `xhscdn.com` subdomain is not implicitly trusted.
+- XHS parsing retains its exact CDN rules. The separate media relay uses explicit platform/type namespaces in `services/media_policy.py`; a new CDN family is never implicitly trusted.
 - A video candidate needs positive MP4 evidence from its format, MIME type, or path; an
   otherwise ambiguous stream is not labeled as MP4.
 - Internal parsed results are frozen dataclasses. Pydantic models are used at the HTTP boundary.
@@ -32,3 +31,7 @@ deploy/                   # additive deployment examples
   redirects, transport, and parsing all consume the original total deadline.
 
 Use snake_case module names and keep new behavior in the narrowest owning layer.
+
+## Unified media delivery ownership
+
+`parser/providers.py` owns fixed third-party HTTP clients/normalization; `services/safe_http.py` owns vetted-IP pull transport; `media_policy.py` validates media destinations; `media_source.py` checks headers/magic/redirects; `media_tickets.py` owns atomic capabilities; `api/media_routes.py` owns the full ASGI lifetime. Public models receive already-published immutable copies and never own network state.

@@ -1,4 +1,5 @@
-# Add this server block after choosing a domain and certificate paths. It does not proxy media.
+# Include in http {} after choosing domain/certificates. Never log request URI/args.
+log_format parser_safe '$request_id $request_method $status $body_bytes_sent $request_time';
 server {
     listen 443 ssl http2;
     server_name parser.example.com;
@@ -8,6 +9,7 @@ server {
 
     client_max_body_size 8k;
     proxy_intercept_errors off;
+    access_log /var/log/nginx/parser-access.log parser_safe;
 
     error_page 413 = @json_413;
     error_page 502 = @json_502;
@@ -47,6 +49,47 @@ server {
         proxy_connect_timeout 6s;
         proxy_read_timeout 25s;
         proxy_send_timeout 25s;
+    }
+
+    location ^~ /api/v1/media/ {
+        # Nginx error logs can include complete capability URLs: suppress this location's log.
+        error_log /dev/null crit;
+        error_page 502 = @media_502;
+        error_page 503 = @media_503;
+        error_page 504 = @media_504;
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_max_temp_file_size 0;
+        proxy_ignore_client_abort off;
+        proxy_connect_timeout 6s;
+        proxy_read_timeout 60s;
+        send_timeout 60s;
+        gzip off;
+    }
+
+    location @media_502 {
+        default_type application/json;
+        add_header X-Media-Error-Code MEDIA_UPSTREAM_BAD_RESPONSE always;
+        add_header X-Request-ID $request_id always;
+        return 502 '{"success":false,"data":null,"error":{"code":"MEDIA_UPSTREAM_BAD_RESPONSE","message":"媒体服务暂时不可用。","retryable":false},"meta":{"request_id":"$request_id","parsed_at":null,"cache":null}}';
+    }
+    location @media_503 {
+        default_type application/json;
+        add_header X-Media-Error-Code MEDIA_BUSY always;
+        add_header X-Request-ID $request_id always;
+        add_header Retry-After 2 always;
+        return 503 '{"success":false,"data":null,"error":{"code":"MEDIA_BUSY","message":"媒体服务繁忙。","retryable":true},"meta":{"request_id":"$request_id","parsed_at":null,"cache":null}}';
+    }
+    location @media_504 {
+        default_type application/json;
+        add_header X-Media-Error-Code MEDIA_UPSTREAM_TIMEOUT always;
+        add_header X-Request-ID $request_id always;
+        return 504 '{"success":false,"data":null,"error":{"code":"MEDIA_UPSTREAM_TIMEOUT","message":"媒体服务超时。","retryable":true},"meta":{"request_id":"$request_id","parsed_at":null,"cache":null}}';
     }
 
     location @json_413 {

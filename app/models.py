@@ -45,12 +45,15 @@ class InternalCover:
 
 @dataclass(frozen=True)
 class InternalNote:
-    note_id: str
+    note_id: str | None
     title: str | None
     kind: Literal["image", "video"]
     images: tuple[InternalImage, ...]
     videos: tuple[InternalVideo, ...]
     cover: InternalCover | None
+    desc: str = ""
+    author_name: str = ""
+    author_avatar: InternalCover | None = None
 
 
 class StrictModel(BaseModel):
@@ -122,8 +125,16 @@ class VideoNote(StrictModel):
 ParsedNote = Annotated[ImageNote | VideoNote, Field(discriminator="type")]
 
 
+class AuthorMetadata(StrictModel):
+    name: str = ""
+    avatar: HttpUrl | None = None
+
+
 class UnifiedImageNote(StrictModel):
-    note_id: str = Field(pattern=r"^(?:[0-9a-fA-F]{24}|[0-9]{18,20})$")
+    note_id: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_-]{1,128}$")
+    platform: Literal["xhs", "douyin", "bilibili", "unknown"]
+    desc: str = ""
+    author: AuthorMetadata = Field(default_factory=AuthorMetadata)
     title: str | None
     type: Literal["image"]
     images: list[ImageMedia] = Field(min_length=1)
@@ -132,7 +143,10 @@ class UnifiedImageNote(StrictModel):
 
 
 class UnifiedVideoNote(StrictModel):
-    note_id: str = Field(pattern=r"^(?:[0-9a-fA-F]{24}|[0-9]{18,20})$")
+    note_id: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_-]{1,128}$")
+    platform: Literal["xhs", "douyin", "bilibili", "unknown"]
+    desc: str = ""
+    author: AuthorMetadata = Field(default_factory=AuthorMetadata)
     title: str | None
     type: Literal["video"]
     images: list[ImageMedia] = Field(max_length=0)
@@ -185,8 +199,10 @@ class HealthResponse(StrictModel):
     status: Literal["ok"] = "ok"
 
 
-def to_public_note(note: InternalNote) -> ImageNote | VideoNote:
-    images, videos, cover = _to_public_components(note)
+def to_public_note(note: InternalNote, expires_at: datetime | None = None) -> ImageNote | VideoNote:
+    if note.note_id is None:
+        raise ValueError("legacy note requires an identity")
+    images, videos, cover = _to_public_components(note, expires_at)
     if note.kind == "image":
         return ImageNote(
             note_id=note.note_id,
@@ -206,10 +222,20 @@ def to_public_note(note: InternalNote) -> ImageNote | VideoNote:
     )
 
 
-def to_unified_public_note(note: InternalNote) -> UnifiedImageNote | UnifiedVideoNote:
-    public = _to_public_components(note)
+def to_unified_public_note(
+    note: InternalNote,
+    platform: Literal["xhs", "douyin", "bilibili", "unknown"],
+    expires_at: datetime | None = None,
+) -> UnifiedImageNote | UnifiedVideoNote:
+    public = _to_public_components(note, expires_at)
+    author = AuthorMetadata(
+        name=note.author_name, avatar=note.author_avatar.url if note.author_avatar else None
+    )
     if note.kind == "image":
         return UnifiedImageNote(
+            platform=platform,
+            desc=note.desc,
+            author=author,
             note_id=note.note_id,
             title=note.title,
             type="image",
@@ -218,6 +244,9 @@ def to_unified_public_note(note: InternalNote) -> UnifiedImageNote | UnifiedVide
             cover=None,
         )
     return UnifiedVideoNote(
+        platform=platform,
+        desc=note.desc,
+        author=author,
         note_id=note.note_id,
         title=note.title,
         type="video",
@@ -229,13 +258,14 @@ def to_unified_public_note(note: InternalNote) -> UnifiedImageNote | UnifiedVide
 
 def _to_public_components(
     note: InternalNote,
+    expires_at: datetime | None = None,
 ) -> tuple[list[ImageMedia], list[VideoMedia], CoverMedia | None]:
     images = [
         ImageMedia(
             url=item.url,
             source_width=item.source_width,
             source_height=item.source_height,
-            url_expires_at=None,
+            url_expires_at=expires_at,
             verification="not_checked",
             index=item.index,
             live_video=(
@@ -243,7 +273,7 @@ def _to_public_components(
                     url=item.live_video.url,
                     source_width=item.live_video.source_width,
                     source_height=item.live_video.source_height,
-                    url_expires_at=None,
+                    url_expires_at=expires_at,
                     verification="not_checked",
                     format="mp4",
                     codec=item.live_video.codec,
@@ -262,7 +292,7 @@ def _to_public_components(
             url=item.url,
             source_width=item.source_width,
             source_height=item.source_height,
-            url_expires_at=None,
+            url_expires_at=expires_at,
             verification="not_checked",
             format="mp4",
             codec=item.codec,
@@ -278,7 +308,7 @@ def _to_public_components(
             url=note.cover.url,
             source_width=note.cover.source_width,
             source_height=note.cover.source_height,
-            url_expires_at=None,
+            url_expires_at=expires_at,
             verification="not_checked",
         )
     return images, videos, cover

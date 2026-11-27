@@ -11,8 +11,9 @@ from datetime import datetime
 from app.config import Settings
 from app.errors import AppError
 from app.models import InternalNote
-from app.parser.adapters import Adapter, DouyinAdapter, PageFetcher, Platform, XiaohongshuAdapter
+from app.parser.adapters import Adapter, PageFetcher, Platform, XiaohongshuAdapter
 from app.parser.client import Deadline
+from app.parser.providers import ProviderAdapter
 from app.services.admission import AdmissionController
 from app.services.cache import CacheEntry, ResultCache
 from app.services.rate_limit import RateLimiter
@@ -37,7 +38,9 @@ class ParseService:
         self.settings = settings
         self.adapters: dict[Platform, Adapter] = {
             "xiaohongshu": XiaohongshuAdapter(settings, client),
-            "douyin": DouyinAdapter(settings),
+            "douyin": ProviderAdapter(settings, "douyin"),
+            "bilibili": ProviderAdapter(settings, "bilibili"),
+            "unknown": ProviderAdapter(settings, "unknown"),
         }
         self.cache = ResultCache(settings.cache_ttl_seconds, settings.cache_max_entries)
         self.rate_limiter = RateLimiter(settings.rate_limit_per_minute)

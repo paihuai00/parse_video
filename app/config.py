@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import math
 import os
 from dataclasses import dataclass
+from urllib.parse import urlsplit
 
 
 def _positive_int(name: str, default: int) -> int:
@@ -23,7 +25,7 @@ def _positive_float(name: str, default: float) -> float:
         value = float(raw)
     except ValueError as exc:
         raise RuntimeError(f"{name} must be a number") from exc
-    if value <= 0:
+    if not math.isfinite(value) or value <= 0:
         raise RuntimeError(f"{name} must be positive")
     return value
 
@@ -48,6 +50,37 @@ class Settings:
     douyin_browser_max_bytes: int = 32 * 1024 * 1024
     douyin_state_max_bytes: int = 2 * 1024 * 1024
     douyin_browser_channel: str | None = None
+    media_publication_enabled: bool = False
+    media_public_origin: str = "https://parser.example.com"
+    media_signing_key: str = ""
+    media_ticket_ttl_seconds: int = 1800
+    media_ticket_max_entries: int = 2048
+    media_ticket_max_bytes: int = 2 * 1024 * 1024
+    media_concurrency: int = 2
+    media_queue_capacity: int = 4
+    media_queue_wait_seconds: float = 2.0
+    media_timeout_seconds: float = 480.0
+    media_idle_timeout_seconds: float = 30.0
+    media_max_bytes: int = 200 * 1024 * 1024
+    media_rate_limit_per_minute: int = 120
+    provider_max_json_bytes: int = 1024 * 1024
+    ifphp_api_key: str = ""
+
+    def __post_init__(self) -> None:
+        parts = urlsplit(self.media_public_origin)
+        if (
+            parts.scheme != "https"
+            or not parts.hostname
+            or parts.username
+            or parts.password
+            or parts.port not in {None, 443}
+            or parts.path not in {"", "/"}
+            or parts.query
+            or parts.fragment
+        ):
+            raise RuntimeError("MEDIA_PUBLIC_ORIGIN must be an HTTPS origin")
+        if self.media_publication_enabled and len(self.media_signing_key.encode()) < 32:
+            raise RuntimeError("MEDIA_SIGNING_KEY must contain at least 32 bytes")
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -76,4 +109,20 @@ class Settings:
             ),
             douyin_state_max_bytes=_positive_int("XHS_DOUYIN_STATE_MAX_BYTES", 2 * 1024 * 1024),
             douyin_browser_channel=(os.getenv("XHS_DOUYIN_BROWSER_CHANNEL", "").strip() or None),
+            media_publication_enabled=os.getenv("MEDIA_PUBLICATION_ENABLED", "false").lower()
+            == "true",
+            media_public_origin=os.getenv("MEDIA_PUBLIC_ORIGIN", "https://parser.example.com"),
+            media_signing_key=os.getenv("MEDIA_SIGNING_KEY", ""),
+            media_ticket_ttl_seconds=_positive_int("MEDIA_TICKET_TTL_SECONDS", 1800),
+            media_ticket_max_entries=_positive_int("MEDIA_TICKET_MAX_ENTRIES", 2048),
+            media_ticket_max_bytes=_positive_int("MEDIA_TICKET_MAX_BYTES", 2 * 1024 * 1024),
+            media_concurrency=_positive_int("MEDIA_CONCURRENCY", 2),
+            media_queue_capacity=_positive_int("MEDIA_QUEUE_CAPACITY", 4),
+            media_queue_wait_seconds=_positive_float("MEDIA_QUEUE_WAIT_SECONDS", 2),
+            media_timeout_seconds=_positive_float("MEDIA_TIMEOUT_SECONDS", 480),
+            media_idle_timeout_seconds=_positive_float("MEDIA_IDLE_TIMEOUT_SECONDS", 30),
+            media_max_bytes=_positive_int("MEDIA_MAX_BYTES", 200 * 1024 * 1024),
+            media_rate_limit_per_minute=_positive_int("MEDIA_RATE_LIMIT_PER_MINUTE", 120),
+            provider_max_json_bytes=_positive_int("PROVIDER_MAX_JSON_BYTES", 1024 * 1024),
+            ifphp_api_key=os.getenv("IFPHP_API_KEY", ""),
         )
