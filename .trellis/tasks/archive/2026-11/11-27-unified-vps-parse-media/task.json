@@ -3,7 +3,7 @@
   "name": "unified-vps-parse-media",
   "title": "Unified VPS parsing and media proxy",
   "description": "One VPS parse endpoint dispatching XHS, existing third-party Douyin, Bilibili and generic providers, returning VPS-only media URLs with bounded streaming.",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": null,
@@ -11,7 +11,7 @@
   "creator": "codex",
   "assignee": "codex",
   "createdAt": "2026-11-27",
-  "completedAt": null,
+  "completedAt": "2026-11-27",
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
@@ -25,10 +25,10 @@
     "app/api/media_routes.py",
     "app/models.py",
     "app/parser/adapters.py",
-    "app/parser/providers/",
+    "app/parser/providers.py",
     "app/services/parse_service.py",
     "app/services/media_tickets.py",
-    "app/services/media_stream.py",
+    "app/services/media_source.py",
     "app/services/media_policy.py",
     "app/main.py",
     "app/config.py",
@@ -37,12 +37,17 @@
     "deploy/nginx.conf.example",
     ".env.example",
     "docs/openapi.json",
-    "docs/deployment.md"
+    "docs/deployment.md",
+    "app/services/safe_http.py",
+    "docs/unified-vps-media.md"
   ],
-  "notes": "",
+  "notes": "User approved development completion and archive on 2026-11-27. Uncompleted release/device/source acceptance is retained in /Users/didi/ai_project/video_download_mini/.trellis/tasks/11-27-unified-vps-release-acceptance. No release acceptance is asserted by archive.",
   "meta": {
     "business_memory_run_id": "cf093096-69b4-4615-938e-c33ce44165ec",
     "business_memory_state_dir": ".trellis/.runtime/business-memory/cf093096-69b4-4615-938e-c33ce44165ec",
-    "business_memory_status": "finished"
+    "business_memory_status": "finished",
+    "closure_disposition": "development_completed",
+    "release_acceptance_task": "/Users/didi/ai_project/video_download_mini/.trellis/tasks/11-27-unified-vps-release-acceptance",
+    "closure_approved_at": "2026-11-27T21:33:56.873125+08:00"
   }
 }

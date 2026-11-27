@@ -1,10 +1,12 @@
 # Backend implementation plan
 
+> Development closure approved on 2026-11-27. See [completion](completion.md) and the [remaining acceptance task](/Users/didi/ai_project/video_download_mini/.trellis/tasks/11-27-unified-vps-release-acceptance/prd.md). This closure supersedes prior in-progress status summaries; unchecked release items are transferred, not passed.
+
 ## Entry gate
 
 - [x] Obtain explicit approval of the latest final plan. Remain planning until then; do not run `task.py start` or change product code yet.
 - [x] Recheck task artifacts, applicable backend specs and unrelated worktree changes. No Git write operations, even indirectly through hooks/tests.
-- [x] Prepare any required business-memory persistence as a separately reviewed batch; this task has no memory-write authorization.
+- [x] Complete the approved initial memory lifecycle; keep finished runs immutable as historical evidence. This update is explicitly authorized record maintenance.
 
 ## 1. Contract and bounded transport proof
 
@@ -54,13 +56,18 @@ python -m json.tool docs/openapi.json >/dev/null
 
 - [x] Validate runtime OpenAPI against checked-in schema/examples; tests do not call real upstreams.
 - [x] Run client integration fixtures for all platform/provider paths.
-- [ ] Review Nginx config in a suitable environment and inspect lifecycle/test helpers before any operation that might write Git.
+- [x] Nginx `nginx -t` passed before/after the recorded VPS cutover; lifecycle/test helpers were checked for prohibited Git writes.
 
 
-## 7. Release gates (separate authorization)
+## 7. Recorded release progress and remaining acceptance
 
-- [ ] Verify fixed third-party providers from the VPS using authorized samples, with redacted evidence.
-- [ ] Verify complete image/MP4 bytes, cancellation and parsing under concurrent media traffic.
-- [ ] Coordinate WeChat request/download domain configuration and new-client release.
-- [ ] Verify all platform paths on real devices with domain validation enabled; correct any required HEAD/Range behavior before release.
-- [ ] Prepare reversible deployment and retain issued media endpoints during rollback. Do not deploy or publish automatically.
+- [x] Backend candidate deployment and authorized seven-work live verification completed; candidate and formal HTTPS each passed 7/7 parses and 25/25 full media downloads.
+- [x] Nginx runtime validation, safe media routing and independently verified representative Mac-to-production image/video downloads completed.
+- [x] Shared two-transfer scheduling/local-preview fixes passed 69 client tests and the bounded 13-image developer-tool preview case; backend remained unchanged.
+- [x] Rollback backups and automatic cutover recovery were prepared; this does not establish a completed rollback drill.
+- [ ] Verify Bilibili, generic and motion-photo live sources; the existing sample set did not cover them.
+- [ ] Complete domain-check-enabled real-device preview/save, post-fix album saving, cancellation and any necessary HEAD/Range validation.
+- [ ] Complete experience/formal client publication only after acceptance and explicit authorization.
+- [ ] Exercise an actual rollback drill and verify ongoing image/video behavior under production concurrency.
+
+See `verification.md`, `vps-deployment-verification.md` and `wechat-devtools-verification.md`. This synchronization does not deploy or retest live services.

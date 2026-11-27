@@ -1,8 +1,10 @@
 # Unified VPS parsing and media delivery design
 
+> Development closure approved on 2026-11-27. See [completion](completion.md) and the [remaining acceptance task](/Users/didi/ai_project/video_download_mini/.trellis/tasks/11-27-unified-vps-release-acceptance/prd.md). This closure supersedes prior in-progress status summaries; unchecked release items are transferred, not passed.
+
 ## Status and ownership
 
-Final planning artifact; not implemented or deployed. This repository owns provider HTTP calls, provider adaptation, parse dispatch, media publication and streaming. The paired client task owns the single-request UI integration and saving lifecycle. No Git writes are authorized.
+Implemented architecture, synchronized with the recorded VPS deployment of `fea3e7d`. This repository owns provider calls/adaptation, parse dispatch, media publication and streaming. The client task owns UI and saving. Nginx plus seven supplied parses/25 complete downloads passed; device and remaining source/publication/rollback gates are open. This synchronization authorizes no new Git writes or deployment.
 
 ## Routing
 
@@ -23,7 +25,7 @@ The native Douyin adapter remains isolated code, not an unapproved fallback. The
 
 Reuse `ParseService` admission, rate limiting, success cache and request coalescing. Extend platform keys to include Bilibili/generic, and namespace cache identities by platform and strategy version so native/third-party results cannot collide.
 
-Introduce fixed provider clients and source-specific normalizers under `app/parser/providers/` (or the narrowest existing equivalent). Port JSON/status validation from current client and ifphp service; do not copy browser-native Douyin restrictions onto third-party results.
+Introduce fixed provider clients and source-specific normalizers in `app/parser/providers.py`. Port JSON/status validation from current client and ifphp service; do not copy browser-native Douyin restrictions onto third-party results.
 
 - Each provider returns one immutable normalized result, not its original JSON.
 - Keep image slot order and aligned motion videos. Inspect dynamic metadata before using a generic source; never silently publish a motion-bearing item as still-only because an adapter ignored a field.
@@ -83,8 +85,8 @@ After response bytes start, errors interrupt the stream; do not append JSON. Rec
 
 Update `main.py`, `config.py`, `.env.example`, runtime locks if needed, Nginx examples, compose environment wiring if required, API examples, OpenAPI, README and service-contract specs. Download routes disable proxy buffering/cache/temp-file spill and propagate disconnects. Provider and media route errors use generic wording, not XHS-only errors. Preserve unrelated Node reporting/email services; migrate ifphp acquisition to Python using its server-side environment key, and retire only its parsing route after compatibility review.
 
-Use a staged media-publication switch for rollout: deploy new server routes first, verify candidate behavior, release the single-endpoint client, then enable direct proxy URL publication. The transitional client must reject/raw-refresh any CDN output before saving; it must never direct-download it. Keep already-issued media routes available during rollback. Do not roll back to a server version incapable of serving new clients without a compatible stop/maintenance strategy. Deployment and release remain separately authorized.
+Use a staged media-publication switch for rollout: deploy and verify new server routes, configure the trusted public origin/signing key and legal domains, and enable working media publication before formal new-client release. An experience build may verify a candidate environment earlier. The transitional client must reject/raw-refresh any CDN output before saving; it must never direct-download it. Keep already-issued media routes available during rollback. Do not roll back to a server version incapable of serving new clients without a compatible stop/maintenance strategy. Deployment and release remain separately authorized.
 
 ## Evidence and deferred work
 
-Offline source/fixture evidence establishes the current call chains; no actual VPS reachability or complete media transfer has been verified. Provider/CDN samples, complete-file checks and domain-enabled real-device checks are release gates. No persistent cache, database, Redis, transcoding, native Live Photo creation, independent provider-learning system or default native-Douyin fallback is included.
+Offline checks establish all four platform contracts. The recorded live run additionally verified seven supplied works and 25 complete media files over candidate/formal HTTPS; Nginx validation passed. This sample set did not cover Bilibili/generic/motion-photo live behavior. Domain-enabled devices, post-fix album saving, formal client publication and rollback drill remain release gates. No persistent cache, database, Redis, transcoding, native Live Photo creation, independent provider-learning system or default native-Douyin fallback is included.

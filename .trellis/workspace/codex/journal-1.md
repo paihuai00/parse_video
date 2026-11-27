@@ -247,3 +247,65 @@ Confirmed f9dd538 API container rebuilt at 2026-11-06 13:36:56 UTC and remains r
 ### Next Steps
 
 - 迁移到 VPS 后复验真实出口网络和调用方媒体下载。
+
+
+## Session 10: 统一 VPS 解析进展同步与旧任务收尾
+
+**Date**: 2026-11-27
+**Task**: 统一 VPS 解析进展同步与旧任务收尾
+**Branch**: `main`
+
+### Summary
+
+同步已有部署和验收证据及任务路径，当前统一解析任务保留进行中，不新增部署或 Git 写操作。
+
+### Main Changes
+
+- 同步 PRD、设计、实施清单、验证记录和 relatedFiles，纠正正式发布前启用生产中转的顺序。
+
+### Git Commits
+
+(No commits - planning session)
+
+### Testing
+
+- [OK] 核对既有 489 后端测试、69 客户端测试、VPS 七条解析和25个完整下载及 Nginx 验证记录；本轮未重跑全量测试。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 保留真机域名校验与修复后相册保存、B站/通用/动态图文线上覆盖、正式发布和回滚演练。
+
+
+## Session 11: 统一 VPS 后端开发完成归档
+
+**Date**: 2026-11-27
+**Task**: 统一 VPS 后端开发完成归档
+**Branch**: `main`
+
+### Summary
+
+按用户确认将后端任务以开发完成归档；未验收的真机、来源、发布与回滚事项由独立上线验收任务承接，未标记通过。
+
+### Main Changes
+
+- 保留489项测试、VPS/Nginx及七条解析25个完整下载的已有证据，完成路径与后续任务关联。
+
+### Git Commits
+
+(No commits - planning session)
+
+### Testing
+
+- [OK] 本轮仅验证记录、引用及任务状态，不重跑测试或执行线上操作。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 跟踪小程序仓库11-27-unified-vps-release-acceptance验收任务，发布和线上操作仍需相应授权。

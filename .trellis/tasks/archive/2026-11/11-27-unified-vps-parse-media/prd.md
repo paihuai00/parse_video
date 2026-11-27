@@ -1,8 +1,8 @@
 # Unified VPS parsing and media proxy
 
-## Planning status
+## Current status
 
-Task creation, final planning and local implementation were authorized on 2026-11-27. All-platform VPS dispatch and direct VPS media URLs are implemented and locally verified (489 backend tests, quality checks and four-platform client contract). The task remains in progress for separately authorized deployment/live-provider/Nginx/device release gates. No Git writes were performed.
+Development is complete and approved for archive. Implementation, quality checks and the recorded deployment/sample/tool evidence are retained in verification.md. All still-unverified release/device/source requirements are carried by `/Users/didi/ai_project/video_download_mini/.trellis/tasks/11-27-unified-vps-release-acceptance`; they are not marked passed or silently waived. See completion.md for the transfer map.
 
 ## Goal
 
@@ -33,7 +33,7 @@ The mini program submits a share URL to one VPS endpoint. The VPS detects the pl
 - `app/api/routes.py:parse_note` retains the XHS-specific route.
 - `app/models.py:_to_public_components` assembles public media fields.
 - `app/services/cache.py` stores raw `InternalNote` records.
-- The current service contract excludes media proxying; code, OpenAPI, examples, deployment docs and specs must change together.
+- The pre-migration contract excluded media proxying; the implemented contract now covers unified provider dispatch and bounded media delivery, with OpenAPI/docs/specs synchronized.
 - Existing Douyin direct acquisition and current mini-program third-party provider chains are separate capabilities. `app/parser/adapters.py:DouyinAdapter` uses short-link expansion, mobile share acquisition for ordinary videos, then eligible browser fallback. `app/parser/douyin/media.py:normalize_douyin_note` explicitly rejects motion-bearing image works.
 - `InternalImage.live_video` and public `ImageMedia.live_video` can represent per-image motion, but this does not mean native Douyin acquisition currently supports it. `InternalNote` has no platform field, so provider context must be passed separately if needed.
 - `docs/douyin/technical-design.md` does not promise watermark removal or watermark-free output. Selecting native acquisition must not silently introduce a watermark-free guarantee.
@@ -44,7 +44,7 @@ The mini program submits a share URL to one VPS endpoint. The VPS detects the pl
 - Keep media credential/transport responsibilities separate from page acquisition and provider parsing.
 - Keep current anonymous sessions isolated; do not accept arbitrary client Cookie/Authorization/Referer headers.
 - Do not introduce Redis, a database, persistent media storage, transcoding, native iOS Live Photo generation, or multiple workers.
-- No Git mutations, implementation, real-provider probes or deployment in this planning round.
+- This record-synchronization/closure round performs no product changes, Git writes or deployment. Earlier implementation/live checks/deployment remain documented evidence, not new actions.
 
 ## Planned acceptance criteria
 
@@ -75,6 +75,6 @@ The mini program submits a share URL to one VPS endpoint. The VPS detects the pl
 
 ## Coordination
 
-Client task: `/Users/didi/ai_project/video_download_mini/.trellis/tasks/11-27-unified-vps-parse-client/`.
-`design.md` and `implement.md` define the final architecture and ordered implementation/validation plan. Spec manifests contain real entries. Present the final plan and obtain fresh implementation approval before `task.py start` or source changes.
+Client task: `/Users/didi/ai_project/video_download_mini/.trellis/tasks/archive/2026-11/11-27-unified-vps-parse-client/`.
+`design.md`, `implement.md` and `verification.md` record the implemented architecture, completed checks and remaining acceptance. See `vps-deployment-verification.md` and `wechat-devtools-verification.md` for scoped live/UI evidence. No remaining acceptance is silently waived.
 

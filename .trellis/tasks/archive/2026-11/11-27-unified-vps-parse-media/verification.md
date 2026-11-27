@@ -1,5 +1,18 @@
 # Implementation verification status
 
+> Development closure approved on 2026-11-27. See [completion](completion.md) and the [remaining acceptance task](/Users/didi/ai_project/video_download_mini/.trellis/tasks/11-27-unified-vps-release-acceptance/prd.md). This closure supersedes prior in-progress status summaries; unchecked release items are transferred, not passed.
+
+## Current synchronized summary
+
+- Authorized record synchronization and historical-task closure completed: two superseded client tasks were archived, the old planning run was closed as skipped_by_user, and both codex journals were appended with no-commit. The current two tasks were not archived.
+- Recorded local checks: 489 backend tests and 69 client tests passed. This documentation-only synchronization did not rerun the full suites.
+- Backend `fea3e7d` was deployed with publication enabled. Nginx runtime checks passed; candidate/formal HTTPS each passed seven supplied parses and 25 complete media downloads.
+- Client `d24d47f` includes the shared queue, windowed image display, local-file native preview and history-unload fixes; formal client publication is still pending.
+- The post-fix developer-tool 13-image preview case passed. Earlier single-image/video album saves passed before that fix; post-fix album saving and domain-enabled device checks remain unverified.
+- Bilibili/generic/motion live coverage, experience/formal release, device cancellation/Range behavior and a rollback drill remain open. The two current tasks stay `in_progress`.
+- Evidence: backend task `vps-deployment-verification.md`, `wechat-devtools-verification.md` and chronological verification entries. Earlier undeployed/40-test statements below are historical snapshots superseded by this summary.
+- This synchronization/old-task closure performs no product edits, new tests, live requests, deployment or Git writes.
+
 ## Ownership and state
 
 Backend implementation was delivered by Paseo agent `7388c8da-57e0-4a70-805a-c94d8e9ffe7c`. Main-session final verification passed. The task remains in progress for release gates, with no deployment or Git writes performed.
