@@ -144,3 +144,106 @@ Reproduced both user failures as checked HTTP 200 text/plain zero-byte details, 
 ### Status
 
 [OK] **Completed**
+
+
+## Session 7: Regional Live Photo video host repair and VPS release
+
+**Date**: 2026-11-06
+**Task**: Regional Live Photo video host repair and VPS release
+**Branch**: `main`
+
+### Summary
+
+Validated and pushed f9dd538; fast-forwarded the same VPS repository, deployed API, and passed all three real parse ingress layers.
+
+### Main Changes
+
+- Added three exact video-only rednote CDN hosts and 47 regional regression cases; preserved existing configuration edits.
+
+### Git Commits
+
+- Work commit `f9dd538a2a7491e74988398258479502b38ff93d`, explicitly authorized, pushed and deployed. Journal helper auto-commit disabled.
+
+### Testing
+
+- [OK] 385 tests; Ruff; Mypy; compile; OpenAPI JSON; synthetic baseline/candidate; local real HTTP; deployed source hashes; VPS loopback, verified Nginx TLS and public HTTPS all passed.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Unknown media hosts remain rejected; investigate new candidates with bounded sanitized evidence.
+
+### Deployment evidence
+
+- New container: `df631ff18719`; image `sha256:570abd1e037a075b5e87aa0ec1512ea09bdfa742891aaa0866539f0b195541f0`.
+- Rollback image retained: `parser-video:rollback-20261106-before-f9dd538`.
+- Running parser hashes matched; production configuration files and runtime environment unchanged.
+- 2026-11-06 UTC: all refresh requests returned 200 JSON, cache miss, 4 images / 4 nested Live Photo MP4s / 0 top-level videos.
+- VPS loopback, 13:38:21 UTC: `a8bef0e2-cf6e-46cb-8898-3c2ac1f1a302`, 2732 ms.
+- Verified local Nginx HTTPS, 13:38:24 UTC: `72e98c5f-61af-46d0-a323-3164e5a0e767`, 1880 ms.
+- Public HTTPS, 13:38:26 UTC: `f792d623-1647-4d5e-a9ff-98b543078ead`, 2664 ms.
+- All request IDs matched successful application logs; both proxy requests matched Nginx logs.
+- No new task created; existing unrelated planning tasks were not archived.
+
+
+## Session 8: Confirmed deployed API and archived resolved diagnosis
+
+**Date**: 2026-11-06
+**Task**: Confirmed deployed API and archived resolved diagnosis
+**Branch**: `main`
+
+### Summary
+
+Confirmed f9dd538 API container rebuilt at 2026-11-06 13:36:56 UTC and remains running/healthy. Final public parse recheck passed; archived the local diagnosis and VPS counterpart/evidence tasks with --no-commit.
+
+### Main Changes
+
+- Archived 10-31-xhs-server-diagnosis with completion evidence; preserved original edits and disabled automatic session commits on both machines.
+
+### Git Commits
+
+(No commits - planning session)
+
+### Testing
+
+- [OK] 2026-11-06 13:48:44 UTC: public HTTP 200 JSON, cache miss, 4 images, 4 Live Photo MP4s, zero top-level videos. Request e443efb3-cc75-4493-b8e3-3a4e0d9d2a7c matched application log.
+
+### Status
+
+[OK] **Completed**
+
+
+## Session 9: 抖音普通视频接入移动分享页 HTTP 解析
+
+**Date**: 2026-11-24
+**Task**: 抖音普通视频接入移动分享页 HTTP 解析
+**Branch**: `main`
+
+### Summary
+
+统一接口自动区分抖音和小红书，本机 Docker 可用，抖音视频返回可独立下载的 MP4 直链。
+
+### Main Changes
+
+- 接入匿名移动分享页采集，支持实测的精确 CDN，保留图文解析与安全回退。
+- 补充 Postman Collection、部署说明和 Trellis 服务契约。
+
+### Git Commits
+
+(No commits - planning session)
+
+### Testing
+
+- [OK] Ruff、mypy、403 项 pytest 与本机 13 条 Postman 断言通过。
+- [OK] 两条抖音视频完整下载并解码，三条小红书短链通过两个入口，抖音动态图文返回预期的 422。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 迁移到 VPS 后复验真实出口网络和调用方媒体下载。
